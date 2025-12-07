@@ -66,7 +66,7 @@ export default function Login() {
           animation: "fadeIn 0.8s ease",
         }}
       >
-        <h2 className="fw-bold text-center mb-3 mb-md-4 login-title-responsive">Login</h2>
+        <h2 className="fw-bold text-center mb-3 mb-md-4 login-title-responsive">App Login</h2>
 
         <div className="text-center">
           <button
