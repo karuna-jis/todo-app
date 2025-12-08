@@ -1,14 +1,52 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import googleLogo from "../img/google.png";
 import { auth, db } from "./firebase.js";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult 
+} from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  // Check for redirect result on component mount
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setLoading(true);
+          const user = result.user;
+          const exists = await checkEmailInFirestore(user.email);
+
+          if (!exists) {
+            Swal.fire({
+              toast: true,
+              position: "top-end",
+              icon: "error",
+              title: "Your Google Account is not allowed to login!",
+            });
+            setLoading(false);
+            return;
+          }
+
+          navigate("/dashboard");
+        }
+      } catch (error) {
+        console.error("Redirect result error:", error);
+        setLoading(false);
+      }
+    };
+
+    checkRedirectResult();
+  }, [navigate]);
 
   const checkEmailInFirestore = async (userEmail) => {
     const q = query(collection(db, "users"), where("email", "==", userEmail));
@@ -17,27 +55,101 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
+    // Prevent multiple simultaneous clicks
+    if (loading) return;
+    
     setLoading(true);
     const provider = new GoogleAuthProvider();
+    
+    // Add additional scopes if needed
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    // Set custom parameters
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
 
     try {
+      // Try popup first (better UX)
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
       const exists = await checkEmailInFirestore(user.email);
 
       if (!exists) {
-        // alert("Your Google Account is not allowed to login!");
-         Swal.fire({toast: true,position: "top-end", icon: "error", title: "Your Google Account is not allowed to login!", });
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "Your Google Account is not allowed to login!",
+        });
         setLoading(false);
+        await auth.signOut(); // Sign out if not authorized
         return;
       }
 
       navigate("/dashboard");
     } catch (error) {
-      // alert("Google sign-in failed!");
-       Swal.fire({toast: true,position: "top-end", icon: "error", title: "Google sign-in failed!", });
-      setLoading(false);
+      console.error("Google sign-in error:", error);
+      
+      // Handle specific error types
+      if (error.code === 'auth/popup-blocked') {
+        // Popup was blocked, fallback to redirect
+        Swal.fire({
+          icon: 'info',
+          title: 'Popup Blocked',
+          text: 'Please allow popups for this site, or we will redirect you to Google sign-in.',
+          confirmButtonText: 'Continue with Redirect',
+          showCancelButton: true,
+          cancelButtonText: 'Cancel'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            signInWithRedirect(auth, provider);
+            // Note: setLoading will be handled by redirect result check
+          } else {
+            setLoading(false);
+          }
+        });
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "info",
+          title: "Sign-in cancelled",
+          timer: 2000
+        });
+        setLoading(false);
+      } else if (error.code === 'auth/network-request-failed') {
+        // Network error
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "Network error. Please check your connection.",
+        });
+        setLoading(false);
+      } else if (error.code === 'auth/unauthorized-domain') {
+        // Domain not authorized in Firebase Console
+        Swal.fire({
+          icon: 'error',
+          title: 'Configuration Error',
+          text: 'This domain is not authorized. Please contact the administrator.',
+        });
+        setLoading(false);
+      } else {
+        // Generic error - try redirect as fallback
+        Swal.fire({
+          icon: 'warning',
+          title: 'Sign-in Issue',
+          text: 'Popup sign-in failed. Redirecting to Google sign-in...',
+          timer: 2000,
+          showConfirmButton: false
+        }).then(() => {
+          signInWithRedirect(auth, provider);
+        });
+      }
     }
   };
 
