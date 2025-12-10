@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { getFunctions } from "firebase/functions";
+// Removed getFunctions - using Node.js backend instead of Cloud Functions
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -39,5 +39,6 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
 }
 
 export { messaging, getToken, onMessage };
-export const functions = getFunctions(app);
+
+// Removed functions export - using Node.js backend instead
 export default app;

@@ -23,8 +23,8 @@ import {
 } from "firebase/firestore";
 
 import { useNavigate } from "react-router-dom";
-import { initializeFCMToken, onTokenRefresh } from "../utils/fcmToken";
 import { onMessage, messaging } from "../components/firebase";
+import { initializeFCMToken } from "../utils/fcmToken";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -100,7 +100,6 @@ export default function Dashboard() {
       // Initialize FCM token for push notifications
       if (user.uid) {
         initializeFCMToken(user.uid);
-        onTokenRefresh(user.uid);
       }
     });
 
@@ -109,24 +108,53 @@ export default function Dashboard() {
 
   // Handle foreground FCM messages (when app is open)
   useEffect(() => {
-    if (!messaging || !onMessage) return;
+    if (!messaging || !onMessage) {
+      console.warn("⚠️ FCM messaging not available for foreground messages");
+      return;
+    }
+
+    console.log("✅ Setting up FCM foreground message listener");
 
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
+      console.log("📨 Foreground FCM message received:", payload);
+      console.log("   Notification:", payload.notification);
+      console.log("   Data:", payload.data);
       
       // Show browser notification even when app is in foreground
       if (Notification.permission === "granted") {
-        const notificationTitle = payload.notification?.title || "New Task Created";
+        const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
+        const notificationBody = payload.notification?.body || payload.data?.body || "A new task has been created";
+        
         const notificationOptions = {
-          body: payload.notification?.body || payload.data?.body || "A new task has been created",
+          body: notificationBody,
           icon: payload.notification?.icon || "/logo192.png",
           badge: "/logo192.png",
           tag: payload.data?.taskId || "task-notification",
           data: payload.data || {},
         };
 
+        console.log("🔔 Showing browser notification:", notificationTitle);
+        
         // Show notification
-        new Notification(notificationTitle, notificationOptions);
+        try {
+          const notification = new Notification(notificationTitle, notificationOptions);
+          console.log("✅ Browser notification shown successfully");
+          
+          // Handle notification click
+          notification.onclick = (event) => {
+            event.preventDefault();
+            const data = notification.data || {};
+            if (data.link) {
+              window.location.href = data.link;
+            }
+            notification.close();
+          };
+        } catch (error) {
+          console.error("❌ Error showing notification:", error);
+        }
+      } else {
+        console.warn("⚠️ Notification permission not granted, cannot show notification");
+        console.warn("   Current permission:", Notification.permission);
       }
     });
 
@@ -134,6 +162,7 @@ export default function Dashboard() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
 
   // LOAD PROJECTS (realtime)
   useEffect(() => {

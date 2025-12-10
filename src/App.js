@@ -7,7 +7,6 @@ import {
   Route,
   useNavigate
 } from "react-router-dom";
-// Removed react-toastify - now using Firebase Cloud Messaging push notifications
 
 
 import Login from "./components/Login.js";

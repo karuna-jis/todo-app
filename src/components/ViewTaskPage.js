@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { auth, db } from "./firebase.js";
-// Removed react-toastify - now using Firebase Cloud Messaging push notifications
 
 
 
@@ -18,11 +17,11 @@ import {
   doc,
   deleteDoc,
   getDocs,
+  getDoc,
   where,
   arrayUnion,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
+// Removed Cloud Functions imports - using Node.js backend instead
 
 import {
   Timeline,
@@ -214,21 +213,110 @@ const addTask = async () => {
         // Since creator is already in seenBy, they won't see the badge
       });
       
-      // Send push notifications via Cloud Function
+      // Send push notifications via Node.js backend API
       // This sends FCM push notifications to all assigned users (except creator)
       try {
-        const sendTaskNotification = httpsCallable(functions, "sendTaskNotification");
-        await sendTaskNotification({
-          projectId: projectId,
-          projectName: projectName || "Project",
-          taskId: taskDocRef.id,
-          taskName: taskText.trim(),
-          createdBy: userEmail,
-          createdByUID: userUID,
-          createdByName: userName,
-        });
+        // Get project document to find assigned users
+        const projectDocRef = doc(db, "projects", projectId);
+        const projectDoc = await getDoc(projectDocRef);
+        
+        if (projectDoc.exists()) {
+          const projectData = projectDoc.data();
+          const assignedUsers = projectData.users || [];
+          
+          // Get FCM tokens for all assigned users (except creator)
+          const usersSnapshot = await getDocs(collection(db, "users"));
+          const targetTokens = [];
+          
+          usersSnapshot.forEach((userDoc) => {
+            const userData = userDoc.data();
+            const userDocUID = userDoc.id;
+            
+            // Include user if: assigned to project, has FCM token, and not the creator
+            if (
+              assignedUsers.includes(userDocUID) &&
+              userData.fcmToken &&
+              userDocUID !== userUID
+            ) {
+              targetTokens.push(userData.fcmToken);
+            }
+          });
+          
+          // Send notifications if there are target users
+          if (targetTokens.length > 0) {
+            // Backend API URL - Update this to your deployed backend URL
+            // For local development: http://localhost:3001
+            // For production: https://your-backend.onrender.com
+            const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
+                          "http://localhost:3001";
+            
+            console.log(`📤 Sending notifications to ${targetTokens.length} users`);
+            console.log(`🔗 Backend API URL: ${API_URL}`);
+            console.log(`📋 Target tokens:`, targetTokens.map(t => t.substring(0, 20) + "..."));
+            
+            // Prepare notification data
+            const notificationData = {
+              projectId: projectId,
+              projectName: projectName || "Project",
+              taskId: taskDocRef.id,
+              taskName: taskText.trim(),
+              createdBy: userEmail,
+              createdByUID: userUID,
+              createdByName: userName,
+              link: `/view/${projectId}/${encodeURIComponent(projectName || "Project")}`,
+            };
+            
+            // Call backend API to send batch notifications
+            try {
+              const response = await fetch(`${API_URL}/notify-batch`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  tokens: targetTokens,
+                  title: "New Task Created",
+                  body: `${userName} created: ${taskText.trim()}`,
+                  data: notificationData,
+                }),
+              });
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`❌ Backend API error (${response.status}):`, errorText);
+                throw new Error(`Backend API returned ${response.status}: ${errorText}`);
+              }
+              
+              const result = await response.json();
+              
+              if (result.success) {
+                console.log(`✅ Push notifications sent: ${result.notified} success, ${result.failed} failed`);
+                if (result.failed > 0) {
+                  console.warn(`⚠️ Some notifications failed. Check backend logs.`);
+                }
+              } else {
+                console.error("❌ Failed to send push notifications:", result.error);
+              }
+            } catch (fetchError) {
+              console.error("❌ Error calling backend API:", fetchError);
+              console.error("   Make sure backend server is running at:", API_URL);
+              console.error("   Check if CORS is configured correctly");
+            }
+          } else {
+            console.warn("⚠️ No users to notify:");
+            console.warn(`   - Assigned users: ${assignedUsers.length}`);
+            console.warn(`   - Users with FCM tokens: ${targetTokens.length}`);
+            console.warn(`   - Creator UID: ${userUID}`);
+            console.warn("   Possible reasons:");
+            console.warn("   1. Users haven't granted notification permission");
+            console.warn("   2. FCM tokens not saved in Firestore");
+            console.warn("   3. All assigned users are the creator");
+          }
+        }
       } catch (fcmError) {
-        console.error("Error sending push notification:", fcmError);
+        console.error("❌ Error sending push notification:", fcmError);
+        console.error("   Error details:", fcmError.message);
+        console.error("   Stack:", fcmError.stack);
         // Don't block task creation if FCM fails
       }
     } catch (error) {
