@@ -23,6 +23,8 @@ import {
 } from "firebase/firestore";
 
 import { useNavigate } from "react-router-dom";
+import { initializeFCMToken, onTokenRefresh } from "../utils/fcmToken";
+import { onMessage, messaging } from "../components/firebase";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -94,10 +96,44 @@ export default function Dashboard() {
         console.error("Error fetching user doc:", err);
         setUserRole("user");
       }
+
+      // Initialize FCM token for push notifications
+      if (user.uid) {
+        initializeFCMToken(user.uid);
+        onTokenRefresh(user.uid);
+      }
     });
 
     return () => unsubscribe();
   }, [navigate]);
+
+  // Handle foreground FCM messages (when app is open)
+  useEffect(() => {
+    if (!messaging || !onMessage) return;
+
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("Foreground message received:", payload);
+      
+      // Show browser notification even when app is in foreground
+      if (Notification.permission === "granted") {
+        const notificationTitle = payload.notification?.title || "New Task Created";
+        const notificationOptions = {
+          body: payload.notification?.body || payload.data?.body || "A new task has been created",
+          icon: payload.notification?.icon || "/logo192.png",
+          badge: "/logo192.png",
+          tag: payload.data?.taskId || "task-notification",
+          data: payload.data || {},
+        };
+
+        // Show notification
+        new Notification(notificationTitle, notificationOptions);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   // LOAD PROJECTS (realtime)
   useEffect(() => {
@@ -147,11 +183,11 @@ export default function Dashboard() {
         q,
         (snap) => {
           // Filter notifications where seenBy does NOT include current user UID
-          // This ignores self notifications (creator already in seenBy) and unseen notifications
+          // Recalculate badges only from unseen notifications
           const unseenNotifications = snap.docs.filter((docSnap) => {
             const data = docSnap.data();
             const seenBy = data.seenBy || [];
-            return !seenBy.includes(userUID); // Badge query ignores self notifs using seenBy
+            return !seenBy.includes(userUID); // Count only unseen notifications
           });
           
           const count = unseenNotifications.length;

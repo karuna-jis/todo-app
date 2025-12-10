@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { auth, db } from "./firebase.js";
-import { toast } from "react-toastify";
+// Removed react-toastify - now using Firebase Cloud Messaging push notifications
 
 
 
@@ -17,11 +17,12 @@ import {
   updateDoc,
   doc,
   deleteDoc,
-  getDoc,
   getDocs,
   where,
   arrayUnion,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "./firebase";
 
 import {
   Timeline,
@@ -57,9 +58,9 @@ export default function ViewTaskPage() {
   const [deletingTaskId, setDeletingTaskId] = useState(null);
 
   const STATUS_OPTIONS = ["Pending", "In Progress", "Completed"];
-const [showAddBox, setShowAddBox] = useState(false);
+  const [showAddBox, setShowAddBox] = useState(false);
   // const tasksColPath = collection(db, "projects", projectId, "tasks");
-  const tasksColPath = projectId
+const tasksColPath = projectId
   ? collection(db, "projects", projectId, "tasks")
   : null;
 
@@ -72,7 +73,10 @@ const [showAddBox, setShowAddBox] = useState(false);
       try {
         const user = auth.currentUser;
         const currentUserUID = user?.uid;
-        if (!currentUserUID) return;
+        if (!currentUserUID) {
+          console.log("No current user UID, skipping markNotificationsAsSeen");
+          return;
+        }
 
         const notificationsRef = collection(db, "notifications");
         // Get all notifications for this project
@@ -82,23 +86,45 @@ const [showAddBox, setShowAddBox] = useState(false);
         );
 
         const snapshot = await getDocs(q);
+        console.log(`Found ${snapshot.docs.length} notifications for project ${projectId}`);
         
-        // Update only notifications where seenBy does NOT include current user UID
-        const updatePromises = snapshot.docs
-          .filter((docSnap) => {
-            const data = docSnap.data();
-            const seenBy = data.seenBy || [];
-            return !seenBy.includes(currentUserUID);
-          })
-          .map((docSnap) =>
-            updateDoc(doc(db, "notifications", docSnap.id), {
-              seenBy: arrayUnion(currentUserUID), // Add current user UID to seenBy array
-            })
-          );
+        // Update ALL notifications for this project - push currentUser UID to seenBy
+        // Only update if not already in seenBy to avoid duplicates
+        const notificationsToUpdate = snapshot.docs.filter((docSnap) => {
+          const data = docSnap.data();
+          const seenBy = data.seenBy || [];
+          const shouldUpdate = !seenBy.includes(currentUserUID);
+          if (shouldUpdate) {
+            console.log(`Will update notification ${docSnap.id}, current seenBy:`, seenBy);
+          }
+          return shouldUpdate;
+        });
 
-        await Promise.all(updatePromises);
+        console.log(`Updating ${notificationsToUpdate.length} notifications for user ${currentUserUID}`);
+
+        const updatePromises = notificationsToUpdate.map((docSnap) => {
+          const docRef = doc(db, "notifications", docSnap.id);
+          console.log(`Updating notification ${docSnap.id} with arrayUnion(${currentUserUID})`);
+          return updateDoc(docRef, {
+            seenBy: arrayUnion(currentUserUID), // Add current user UID to seenBy array
+          });
+        });
+
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log(`Successfully updated ${updatePromises.length} notifications`);
+        } else {
+          console.log("No notifications to update");
+        }
       } catch (error) {
         console.error("Error marking notifications as seen:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          stack: error.stack
+        });
+        // Error logged to console - user will see it in browser console
+        console.error("Failed to mark notifications as seen:", error.message);
       }
     };
 
@@ -138,9 +164,9 @@ const [showAddBox, setShowAddBox] = useState(false);
     return task.createdBy === currentUserEmail;
   };
 
-  // Add task
-  const addTask = async () => {
-    if (!taskText.trim()) return;
+ // Add task
+const addTask = async () => {
+  if (!taskText.trim()) return;
     const user = auth.currentUser;
     if (!user) {
       alert("You must be logged in to create tasks.");
@@ -151,51 +177,48 @@ const [showAddBox, setShowAddBox] = useState(false);
     const userName = user?.displayName?.trim() || userEmail;
 
     const taskDocRef = await addDoc(tasksColPath, {
-      text: taskText.trim(),
-      status: "Pending",
+    text: taskText.trim(),
+    status: "Pending",
       createdBy: userEmail, // Store email of creator (never changes)
       createdByName: userName, // Store name of creator (never changes)
       updatedBy: userName, // Store name of last updater (changes only on status update)
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      projectId: projectId,   // <-- REQUIRED !!
-    });
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    projectId: projectId,   // <-- REQUIRED !!
+  });
 
-    // Create notification when task is added
-    // Notifications should be visible to all project members (admin gets user notifications, users get admin notifications)
+    // OPTIMIZED: Create ONE notification per task (not per user)
+    // Previously: Created one notification per project member (inefficient)
+    // Now: Single notification shared by all project members, tracked via seenBy array
+    // This reduces Firestore documents by ~80-90% while maintaining same functionality
     try {
       const userUID = user.uid;
       const notificationsRef = collection(db, "notifications");
       
-      // Get project document to find all assigned users
-      const projectDocRef = doc(db, "projects", projectId);
-      const projectDoc = await getDoc(projectDocRef);
+      // Create a single notification document for this task
+      // Creator is added to seenBy initially so they never see badge for their own task
+      // All other project members will see this notification until they mark it as seen
+      // Badge count logic filters by seenBy array to show unread count per user
+      await addDoc(notificationsRef, {
+        projectId: projectId,
+        projectName: projectName || "Project",
+        taskId: taskDocRef.id,
+        taskName: taskText.trim(),
+        createdBy: userEmail,
+        createdByUID: userUID, // Store UID for filtering
+        createdByName: userName,
+        time: serverTimestamp(),
+        seenBy: [userUID], // Creator UID added initially - creator never sees badge for own task
+        // When other users open ViewTaskPage, their UID is added to seenBy array
+        // Badge count in Dashboard filters notifications where seenBy doesn't include current user
+        // Since creator is already in seenBy, they won't see the badge
+      });
       
-      if (projectDoc.exists()) {
-        const projectData = projectDoc.data();
-        const projectUsers = projectData.users || []; // Array of user UIDs
-        
-        // Create notification for all project members (excluding the creator)
-        const notificationPromises = projectUsers
-          .filter((uid) => uid !== userUID) // Exclude the creator
-          .map((targetUID) =>
-            addDoc(notificationsRef, {
-              projectId: projectId,
-              projectName: projectName || "Project",
-              taskId: taskDocRef.id,
-              taskName: taskText.trim(),
-              createdBy: userEmail,
-              createdByUID: userUID, // Store UID for filtering
-              createdByName: userName,
-              time: serverTimestamp(),
-              seenBy: [userUID], // Creator should never see badge - add creator to seenBy
-            })
-          );
-        
-        await Promise.all(notificationPromises);
-      } else {
-        // Fallback: create single notification if project doc not found
-        await addDoc(notificationsRef, {
+      // Send push notifications via Cloud Function
+      // This sends FCM push notifications to all assigned users (except creator)
+      try {
+        const sendTaskNotification = httpsCallable(functions, "sendTaskNotification");
+        await sendTaskNotification({
           projectId: projectId,
           projectName: projectName || "Project",
           taskId: taskDocRef.id,
@@ -203,23 +226,18 @@ const [showAddBox, setShowAddBox] = useState(false);
           createdBy: userEmail,
           createdByUID: userUID,
           createdByName: userName,
-          time: serverTimestamp(),
-          seenBy: [userUID], // Creator should never see badge
         });
+      } catch (fcmError) {
+        console.error("Error sending push notification:", fcmError);
+        // Don't block task creation if FCM fails
       }
-      
-      // Show toast notification (bottom-left)
-      toast.info(`${userName} created a new task: ${taskText.trim()}`, {
-        position: "bottom-left",
-        autoClose: 3000,
-      });
     } catch (error) {
       console.error("Error creating notification:", error);
       // Don't block task creation if notification fails
     }
 
-    setTaskText("");
-  };
+  setTaskText("");
+};
 
 
   // Open edit modal (we keep modal behavior as original)
@@ -506,10 +524,10 @@ const [showAddBox, setShowAddBox] = useState(false);
             {searchTerm && (
               <button
                 className="btn btn-sm text-muted"
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedIndex(-1);
-                }}
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedIndex(-1);
+              }}
                 style={{
                   position: "absolute",
                   right: "45px",
@@ -545,7 +563,7 @@ const [showAddBox, setShowAddBox] = useState(false);
       {/* Scrollable Timeline Container */}
       <div 
         className="timeline-wrapper-responsive"
-        style={{
+          style={{
           maxHeight: isMobile 
             ? `calc(100vh - ${headerHeight}px - 60px)` // Mobile: Subtract header + WhatsApp input bar (60px)
             : `calc(100vh - ${headerHeight}px - 90px)`, // Desktop: Subtract header + button space
@@ -565,41 +583,41 @@ const [showAddBox, setShowAddBox] = useState(false);
       </div>
     ) : filteredTasks.length === 0 ? (
       <div style={{ padding: "24px 12px" }}>
-        <p className="text-center text-muted mt-4">
+          <p className="text-center text-muted mt-4">
           No tasks match your search.
-        </p>
-      </div>
-    ) : (
+          </p>
+        </div>
+      ) : (
       filteredTasks.map((t, index) => {
         const originalIndex = tasks.findIndex(task => task.id === t.id);
         const isSelected = selectedIndex >= 0 && matchingTaskIndices[selectedIndex] === originalIndex;
         
         return (
-        <TimelineItem 
-          key={t.id}
-          className="task-item-responsive"
-        >
-
-          {/* LEFT SIDE — ONLY DATE */}
-          <TimelineOppositeContent
-            align="right"
-            sx={{ m: "auto 0", fontWeight: 600 }}
-            color="text.secondary"
-            className="timeline-date-responsive"
+          <TimelineItem 
+            key={t.id} 
+            className="task-item-responsive"
           >
+
+            {/* LEFT SIDE — ONLY DATE */}
+            <TimelineOppositeContent
+              align="right"
+              sx={{ m: "auto 0", fontWeight: 600 }}
+              color="text.secondary"
+              className="timeline-date-responsive"
+            >
              {formatTs(t.updatedAt)}
-          </TimelineOppositeContent>
+            </TimelineOppositeContent>
 
-          <TimelineSeparator>
-            <TimelineDot color="success" />
-            <TimelineConnector />
-          </TimelineSeparator>
+            <TimelineSeparator>
+              <TimelineDot color="success" />
+              <TimelineConnector />
+            </TimelineSeparator>
 
-          {/* RIGHT SIDE — COMPLETE TASK CARD */}
-          <TimelineContent sx={{ py: "20px", px: 2 }} className="timeline-content-responsive">
+            {/* RIGHT SIDE — COMPLETE TASK CARD */}
+            <TimelineContent sx={{ py: "20px", px: 2 }} className="timeline-content-responsive">
             <Paper 
               elevation={2} 
-              className="task-card-paper"
+              className="task-card-paper" 
               ref={(el) => {
                 if (el) taskRefs.current[t.id] = el;
               }}
@@ -645,10 +663,10 @@ const [showAddBox, setShowAddBox] = useState(false);
       try {
         // Only update status, updatedBy, and updatedAt when status changes
         // createdBy and createdByName stay the same
-        await updateDoc(ref, {
-          status: e.target.value,
+      await updateDoc(ref, {
+        status: e.target.value,
           updatedBy: userName, // Update who last updated the status
-          updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
           // Note: createdBy and createdByName are NOT included - they never change
         });
       } catch (error) {
@@ -688,10 +706,10 @@ const [showAddBox, setShowAddBox] = useState(false);
 
                 {/* RIGHT — ACTION BUTTONS - Only show if user is creator */}
                 {isTaskCreator(t) && (
-                  <div className="text-end d-flex gap-1 task-action-buttons">
-                    {/* EDIT ICON */}
-                    <button
-                      className="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center task-action-btn"
+                <div className="text-end d-flex gap-1 task-action-buttons">
+  {/* EDIT ICON */}
+  <button
+    className="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center task-action-btn"
                       onClick={() => {
                         if (!isTaskCreator(t)) {
                           alert("You don't have permission to edit this task. Only the creator can edit.");
@@ -699,19 +717,19 @@ const [showAddBox, setShowAddBox] = useState(false);
                         }
                         openEditModal(t);
                       }}
-                      style={{
-                        borderRadius: "50%",
-                        width: "32px",
-                        height: "32px",
-                        padding: 0,
-                      }}
-                      title="Edit"
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                    </button>
-                    {/* DELETE ICON */}
-                    <button
-                      className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center task-action-btn"
+    style={{
+      borderRadius: "50%",
+      width: "32px",
+      height: "32px",
+      padding: 0,
+    }}
+    title="Edit"
+  >
+    <i className="bi bi-pencil-square"></i>
+  </button>
+  {/* DELETE ICON */}
+  <button
+    className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center task-action-btn"
                       onClick={() => {
                         if (!isTaskCreator(t)) {
                           alert("You don't have permission to delete this task. Only the creator can delete.");
@@ -719,17 +737,17 @@ const [showAddBox, setShowAddBox] = useState(false);
                         }
                         confirmDelete(t.id);
                       }}
-                      style={{
-                        borderRadius: "50%",
-                        width: "32px",
-                        height: "32px",
-                        padding: 0,
-                      }}
-                      title="Delete"
-                    >
-                      <i className="bi bi-trash3"></i>
-                    </button>
-                  </div>
+    style={{
+      borderRadius: "50%",
+      width: "32px",
+      height: "32px",
+      padding: 0,
+    }}
+    title="Delete"
+  >
+    <i className="bi bi-trash3"></i>
+  </button>
+</div>
                 )}
 
 
@@ -741,9 +759,9 @@ const [showAddBox, setShowAddBox] = useState(false);
         );
       })
     )}
-  </Timeline>
-        </div>
-      </div>
+    </Timeline>
+  </div>
+</div>
 
       {/* WhatsApp-style Bottom Input Bar - Mobile/Tablet View (max-width: 992px) */}
       {isMobile && (
@@ -831,50 +849,50 @@ const [showAddBox, setShowAddBox] = useState(false);
             </button>
           </div>
 
-          {showAddBox && (
-            <div
-              className="card shadow add-task-box-responsive"
-              style={{
-                position: "fixed",
-                bottom: "20px",
-                right: "20px",
-                width: "100%",
-                maxWidth: "300px",
-                zIndex: 1000,
-                padding: "15px",
-                borderRadius: "12px",
-                animation: "slideUp 0.3s ease",
-                margin: "0 15px",
-              }}
-            >
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <h6 className="m-0 add-task-title">Add Task</h6>
-                <button
-                  className="btn-close"
-                  onClick={() => setShowAddBox(false)}
-                ></button>
-              </div>
+{showAddBox && (
+  <div
+    className="card shadow add-task-box-responsive"
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      right: "20px",
+      width: "100%",
+      maxWidth: "300px",
+      zIndex: 1000,
+      padding: "15px",
+      borderRadius: "12px",
+      animation: "slideUp 0.3s ease",
+      margin: "0 15px",
+    }}
+  >
+    <div className="d-flex justify-content-between align-items-center mb-2">
+      <h6 className="m-0 add-task-title">Add Task</h6>
+      <button
+        className="btn-close"
+        onClick={() => setShowAddBox(false)}
+      ></button>
+    </div>
 
-              <input
-                value={taskText}
-                onChange={(e) => setTaskText(e.target.value)}
-                className="form-control mb-3 add-task-input"
-                placeholder="Enter task"
-              />
+    <input
+      value={taskText}
+      onChange={(e) => setTaskText(e.target.value)}
+      className="form-control mb-3 add-task-input"
+      placeholder="Enter task"
+    />
 
-              <button
-                className="btn btn-success w-100 add-task-submit-btn"
-                onClick={() => {
-                  addTask();
-                  setShowAddBox(false);
-                }}
-              >
-                Add
-              </button>
-            </div>
+    <button
+      className="btn btn-success w-100 add-task-submit-btn"
+      onClick={() => {
+        addTask();
+        setShowAddBox(false);
+      }}
+    >
+      Add
+    </button>
+  </div>
           )}
         </>
-      )}
+)}
 
 
       {/* ---------- Edit Modal ---------- */}

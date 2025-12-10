@@ -2,6 +2,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getFunctions } from "firebase/functions";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -25,4 +27,17 @@ export const db=getFirestore(app);
 export const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 export const secondaryAuth = getAuth(secondaryApp);
 
+// Initialize Firebase Cloud Messaging
+// Note: getMessaging() can only be called in browser environment
+let messaging = null;
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  try {
+    messaging = getMessaging(app);
+  } catch (error) {
+    console.warn("Firebase Messaging initialization failed:", error);
+  }
+}
+
+export { messaging, getToken, onMessage };
+export const functions = getFunctions(app);
 export default app;

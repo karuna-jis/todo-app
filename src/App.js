@@ -7,8 +7,7 @@ import {
   Route,
   useNavigate
 } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+// Removed react-toastify - now using Firebase Cloud Messaging push notifications
 
 
 import Login from "./components/Login.js";
@@ -30,18 +29,6 @@ function App() {
       <Route path="/board/:projectId/:projectName" element={<ProjectBoard />} />
 
     </Routes>
-    <ToastContainer
-      position="bottom-left"
-      autoClose={3000}
-      hideProgressBar={false}
-      newestOnTop={false}
-      closeOnClick
-      rtl={false}
-      pauseOnFocusLoss
-      draggable
-      pauseOnHover
-      theme="light"
-    />
     </Router>
   );
 }
