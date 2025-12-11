@@ -45,9 +45,14 @@ self.addEventListener("push", (event) => {
   const notificationTitle = payload.notification?.title || "Notification";
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body,
-    icon: "/logo192.png",
+    icon: payload.notification?.icon || "/logo192.png",
+    badge: "/logo192.png",
     sound: "default",
-    data: payload.data || {}
+    vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
+    silent: false, // Ensure sound is not silenced
+    data: payload.data || {},
+    tag: payload.data?.taskId || "task-update",
+    requireInteraction: false
   };
 
   event.waitUntil(
@@ -60,18 +65,39 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  const projectId = data.projectId;
-  const projectName = data.projectName || "Project";
+  
+  // Get URL from fcmOptions.link (absolute URL from backend) or construct from data
+  let urlToOpen = data.link || "/dashboard";
+  
+  // If link is relative, make it absolute using the origin
+  if (urlToOpen.startsWith("/")) {
+    // Get origin from any existing client or use default
+    urlToOpen = self.location.origin + urlToOpen;
+  }
+  
+  // Fallback: construct from projectId if link not available
+  if (!data.link && data.projectId) {
+    const projectName = data.projectName || "Project";
+    urlToOpen = self.location.origin + `/view/${data.projectId}/${encodeURIComponent(projectName)}`;
+  }
 
-  const urlToOpen = projectId
-    ? `/view/${projectId}/${encodeURIComponent(projectName)}`
-    : "/dashboard";
+  console.log("[SW] Opening URL:", urlToOpen);
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Try to find and focus existing window with same origin
       for (let client of clientList) {
-        if (client.url.includes(urlToOpen) && "focus" in client) return client.focus();
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          // Focus the window and navigate to the URL
+          return client.focus().then(() => {
+            // Navigate to the URL if it's different
+            if (!client.url.includes(urlToOpen)) {
+              return client.navigate(urlToOpen);
+            }
+          });
+        }
       }
+      // No existing window found, open new one
       return clients.openWindow(urlToOpen);
     })
   );

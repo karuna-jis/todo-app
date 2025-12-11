@@ -533,7 +533,15 @@ if (typeof window !== "undefined") {
 
     console.log("📊 FCM Status Check:");
     console.log("   User UID:", user.uid);
-    console.log("   VAPID_KEY set:", !!process.env.REACT_APP_VAPID_KEY);
+    console.log("   User Email:", user.email);
+    console.log("   VAPID_KEY set:", !!VAPID_KEY);
+    if (VAPID_KEY) {
+      console.log("   VAPID_KEY preview:", VAPID_KEY.substring(0, 20) + "...");
+    } else {
+      console.error("   ❌ VAPID_KEY is NOT set!");
+      console.error("   Create .env file in todos folder with:");
+      console.error("   REACT_APP_VAPID_KEY=your-vapid-key");
+    }
     console.log("   Notification permission:", Notification.permission);
     console.log("   Messaging initialized:", !!messaging);
     

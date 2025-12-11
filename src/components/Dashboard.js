@@ -126,6 +126,47 @@ export default function Dashboard() {
           // Additional delay to ensure service worker registration from index.html completes
           await new Promise(resolve => setTimeout(resolve, 2000));
           
+          // Check notification permission first and prompt if needed
+          if (Notification.permission === "default") {
+            console.log("📢 Notification permission not set, will request...");
+            // Permission will be requested in getFCMToken()
+          } else if (Notification.permission === "denied") {
+            console.warn("⚠️ Notification permission is DENIED");
+            // Show prominent message to user
+            Swal.fire({
+              icon: "warning",
+              title: "Notifications Blocked",
+              html: `
+                <p>You need to enable notifications to receive push alerts.</p>
+                <p><strong>Steps to enable:</strong></p>
+                <ol style="text-align: left; margin: 20px;">
+                  <li>Click the <strong>🔒 lock icon</strong> in your browser's address bar</li>
+                  <li>Go to <strong>Site settings</strong></li>
+                  <li>Find <strong>Notifications</strong> and set it to <strong>Allow</strong></li>
+                  <li>Refresh this page (F5)</li>
+                </ol>
+                <p>Or click the button below to try again:</p>
+              `,
+              showCancelButton: true,
+              confirmButtonText: "Try Again",
+              cancelButtonText: "Later",
+              confirmButtonColor: "#2a8c7b"
+            }).then((result) => {
+              if (result.isConfirmed) {
+                // Try to request permission again (might work in some browsers)
+                Notification.requestPermission().then(permission => {
+                  if (permission === "granted") {
+                    console.log("✅ Permission granted, initializing FCM token...");
+                    initializeFCMToken(user.uid);
+                  } else {
+                    console.warn("⚠️ Permission still not granted");
+                  }
+                });
+              }
+            });
+            return; // Don't proceed if permission is denied
+          }
+          
           // Initialize FCM token with retry mechanism
           const initializeWithRetry = async (retries = 5, delay = 3000) => {
             for (let attempt = 1; attempt <= retries; attempt++) {
@@ -141,6 +182,16 @@ export default function Dashboard() {
                 const success = await initializeFCMToken(user.uid);
                 if (success) {
                   console.log("✅ FCM token initialized successfully!");
+                  // Show success message
+                  Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Notifications Enabled",
+                    text: "You will now receive push notifications",
+                    timer: 3000,
+                    showConfirmButton: false
+                  });
                   return true;
                 } else {
                   console.warn(`⚠️ Attempt ${attempt} failed, will retry...`);
@@ -157,18 +208,30 @@ export default function Dashboard() {
                   console.warn("   2. Run: window.checkFCMStatus() to diagnose");
                   console.warn("   3. Run: window.registerFCMToken() to manually register");
                   
-                  // Show user-friendly message only if permission is the issue
-                  if (Notification.permission === "default" || Notification.permission === "denied") {
-                    Swal.fire({
-                      toast: true,
-                      position: "top-end",
-                      icon: "info",
-                      title: "Enable notifications for push alerts",
-                      text: "Click the lock icon in address bar → Allow notifications",
-                      timer: 5000,
-                      showConfirmButton: false
-                    });
-                  }
+                  // Show user-friendly message with action button
+                  Swal.fire({
+                    icon: "info",
+                    title: "Enable Notifications",
+                    html: `
+                      <p>To receive push notifications, please:</p>
+                      <ol style="text-align: left; margin: 20px;">
+                        <li>Allow notification permission when prompted</li>
+                        <li>Or click the lock icon → Site settings → Notifications → Allow</li>
+                        <li>Then click the button below to register</li>
+                      </ol>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: "Register Now",
+                    cancelButtonText: "Later",
+                    confirmButtonColor: "#2a8c7b"
+                  }).then((result) => {
+                    if (result.isConfirmed) {
+                      // Import and call manual registration
+                      import("../utils/fcmToken").then(({ registerFCMTokenManually }) => {
+                        registerFCMTokenManually();
+                      });
+                    }
+                  });
                 }
               }
             }
