@@ -91,40 +91,72 @@ export default function Dashboard() {
 
   // PWA Install Prompt Handler
   useEffect(() => {
+    // Check if already installed first
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isInStandaloneMode = window.navigator.standalone || isStandalone;
+    
+    if (isInStandaloneMode) {
+      console.log('✅ App is already installed (standalone mode)');
+      setShowInstallButton(false);
+      return;
+    }
+
+    // Check if deferredPrompt already exists (from index.html)
+    if (window.deferredPrompt) {
+      console.log('📱 Found existing deferredPrompt from index.html');
+      setDeferredPrompt(window.deferredPrompt);
+      setShowInstallButton(true);
+    }
+
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e) => {
+      console.log('📱 beforeinstallprompt event received');
       e.preventDefault();
       setDeferredPrompt(e);
+      window.deferredPrompt = e; // Store globally
       setShowInstallButton(true);
-      console.log('📱 PWA install prompt available');
+      console.log('✅ Install button should now be visible');
     };
 
     // Listen for app installed event
     const handleAppInstalled = () => {
       console.log('✅ PWA installed successfully');
       setDeferredPrompt(null);
+      window.deferredPrompt = null;
       setShowInstallButton(false);
     };
 
     // Listen for custom events from index.html
+    const handlePWAInstallable = (e) => {
+      console.log('📱 pwa-installable custom event received');
+      if (e.detail) {
+        handleBeforeInstallPrompt(e.detail);
+      }
+    };
+
+    // Add event listeners
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('pwa-installable', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-installable', handlePWAInstallable);
     window.addEventListener('appinstalled', handleAppInstalled);
     window.addEventListener('pwa-installed', handleAppInstalled);
 
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      console.log('✅ App is already installed');
-      setShowInstallButton(false);
-    }
+    // Periodic check for deferredPrompt (in case event was missed)
+    const checkInterval = setInterval(() => {
+      if (window.deferredPrompt && !deferredPrompt) {
+        console.log('📱 Found deferredPrompt on periodic check');
+        setDeferredPrompt(window.deferredPrompt);
+        setShowInstallButton(true);
+      }
+    }, 2000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('pwa-installable', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-installable', handlePWAInstallable);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('pwa-installed', handleAppInstalled);
+      clearInterval(checkInterval);
     };
-  }, []);
+  }, [deferredPrompt]);
 
   // Handle install button click
   const handleInstallClick = async () => {
@@ -1038,14 +1070,26 @@ export default function Dashboard() {
               right: "15px",
               transform: "translateY(-50%)",
               fontSize: "12px",
-              padding: "6px 12px",
+              padding: "8px 16px",
               borderRadius: "20px",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+              zIndex: 1000,
+              fontWeight: "600",
+              whiteSpace: "nowrap"
             }}
-            title="Install App"
+            title="Install App on your device"
           >
             📱 Install App
           </button>
+        )}
+        
+        {/* Debug: Show install status (remove in production) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="position-absolute" style={{ top: "5px", left: "10px", fontSize: "10px", color: "#fff", zIndex: 1001 }}>
+            Install: {showInstallButton ? "✅" : "❌"} | 
+            Standalone: {window.matchMedia('(display-mode: standalone)').matches ? "✅" : "❌"} |
+            Prompt: {window.deferredPrompt ? "✅" : "❌"}
+          </div>
         )}
       </div>
 
