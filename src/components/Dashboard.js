@@ -31,6 +31,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showNotification } = useNotification();
+  
+  // Extract current projectId from location if user is on ViewTaskPage
+  const currentProjectId = location.pathname.startsWith('/view/') 
+    ? location.pathname.split('/')[2] 
+    : null;
 
   // AUTH STATES
   const [userEmail, setUserEmail] = useState("");
@@ -426,8 +431,8 @@ export default function Dashboard() {
 
       const unsub = onSnapshot(
         q,
-        (snapshot) => {
-          snapshot.docs.forEach((docSnap) => {
+        async (snapshot) => {
+          for (const docSnap of snapshot.docs) {
             const taskData = docSnap.data();
             const taskId = docSnap.id;
             const projectId = project.id;
@@ -436,7 +441,39 @@ export default function Dashboard() {
             if (!lastTaskIds[key]) {
               lastTaskIds[key] = true;
               const taskCreatedBy = taskData.createdBy || "";
-              if (taskCreatedBy === userEmail) return;
+              if (taskCreatedBy === userEmail) continue;
+
+              // Don't show popup if user is currently viewing this project's ViewTaskPage
+              if (currentProjectId === projectId) {
+                console.log(`⏸️ User is viewing project ${projectId}, skipping popup notification`);
+                continue;
+              }
+
+              // Check if user has already seen this notification in Firestore
+              try {
+                const notificationsRef = collection(db, "notifications");
+                const notificationQuery = query(
+                  notificationsRef,
+                  where("projectId", "==", projectId),
+                  where("taskId", "==", taskId)
+                );
+                const notificationSnapshot = await getDocs(notificationQuery);
+                
+                let shouldShowPopup = true;
+                notificationSnapshot.docs.forEach((notifDoc) => {
+                  const notifData = notifDoc.data();
+                  const seenBy = notifData.seenBy || [];
+                  if (seenBy.includes(userUID)) {
+                    shouldShowPopup = false;
+                    console.log(`⏸️ User has already seen notification for task ${taskId}, skipping popup`);
+                  }
+                });
+
+                if (!shouldShowPopup) continue;
+              } catch (error) {
+                console.error("Error checking notification seen status:", error);
+                // Continue to show popup if check fails
+              }
 
               const addedBy = taskData.createdBy || taskData.createdByName || "Unknown";
               const taskName = taskData.text || taskData.taskName || "New Task";
@@ -454,7 +491,7 @@ export default function Dashboard() {
                 timestamp: taskData.createdAt?.toMillis?.() || Date.now(),
               });
             }
-          });
+          }
         },
         (error) => {
           console.error(`Error listening to tasks for project ${project.id}:`, error);
@@ -467,7 +504,7 @@ export default function Dashboard() {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [userUID, userEmail, projects, showNotification]);
+  }, [userUID, userEmail, projects, showNotification, currentProjectId]);
 
   // LOAD ALL USERS (for assign & list)
   useEffect(() => {
