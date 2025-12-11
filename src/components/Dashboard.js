@@ -85,6 +85,10 @@ export default function Dashboard() {
 
       setUserEmail(user.email || "");
       setUserUID(user.uid || "");
+      console.log("👤 User authenticated:", {
+        email: user.email,
+        uid: user.uid
+      });
 
       try {
         const ref = doc(db, "users", user.uid);
@@ -180,13 +184,31 @@ export default function Dashboard() {
 
   // LOAD PROJECTS (realtime)
   useEffect(() => {
-    if (!userUID) return;
+    if (!userUID) {
+      console.log("⚠️ userUID not set, waiting...");
+      return;
+    }
 
+    console.log("📋 Loading projects for user:", userUID);
     const q = query(collection(db, "projects"), where("users", "array-contains", userUID));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setProjects(list);
-    });
+    
+    const unsub = onSnapshot(
+      q, 
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        console.log(`✅ Found ${list.length} projects for user ${userUID}`);
+        list.forEach((p) => {
+          console.log(`   - Project: ${p.name} (ID: ${p.id})`);
+          console.log(`     Assigned users: ${(p.users || []).length}`);
+        });
+        setProjects(list);
+      },
+      (error) => {
+        console.error("❌ Error loading projects:", error);
+        console.error("   Error code:", error.code);
+        console.error("   Error message:", error.message);
+      }
+    );
 
     return () => unsub();
   }, [userUID]);
@@ -354,13 +376,55 @@ export default function Dashboard() {
 
   const saveAssignedUsers = async () => {
     if (!selectedProject) return;
+    
     try {
-      await updateDoc(doc(db, "projects", selectedProject.id), { users: assignedUsers });
+      console.log("💾 Saving assigned users to project:", selectedProject.id);
+      console.log("   Project name:", selectedProject.name);
+      console.log("   Assigned users:", assignedUsers);
+      console.log("   Assigned user count:", assignedUsers.length);
+      
+      // Verify all user UIDs exist
+      const validUsers = [];
+      for (const uid of assignedUsers) {
+        const userExists = allUsers.find(u => u.id === uid);
+        if (userExists) {
+          validUsers.push(uid);
+          console.log(`   ✅ User ${uid} (${userExists.email}) is valid`);
+        } else {
+          console.warn(`   ⚠️ User ${uid} not found in allUsers list`);
+        }
+      }
+      
+      if (validUsers.length !== assignedUsers.length) {
+        console.warn("⚠️ Some users were not found, using only valid users");
+      }
+      
+      // Update project with assigned users
+      await updateDoc(doc(db, "projects", selectedProject.id), { 
+        users: validUsers.length > 0 ? validUsers : assignedUsers 
+      });
+      
+      console.log("✅ Project updated successfully");
+      console.log("   Updated users array:", validUsers.length > 0 ? validUsers : assignedUsers);
+      
       setShowAssignModal(false);
-      Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Users Assigned" });
+      Swal.fire({ 
+        toast: true, 
+        position: "top-end", 
+        icon: "success", 
+        title: `Users Assigned (${validUsers.length > 0 ? validUsers.length : assignedUsers.length} users)` 
+      });
     } catch (err) {
-      console.error(err);
-      Swal.fire({ toast: true, position: "top-end", icon: "error", title: "Failed" });
+      console.error("❌ Error saving assigned users:", err);
+      console.error("   Error code:", err.code);
+      console.error("   Error message:", err.message);
+      Swal.fire({ 
+        toast: true, 
+        position: "top-end", 
+        icon: "error", 
+        title: "Failed to assign users",
+        text: err.message 
+      });
     }
   };
 
