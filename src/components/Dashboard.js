@@ -322,11 +322,32 @@ export default function Dashboard() {
         console.log("Sound playback error:", error);
       }
       
-      // Show custom WhatsApp-style popup notification
-      showNotification({
+      // Extract data from FCM payload
+      // FCM sends data as strings, so we need to parse them properly
+      const notificationData = {
         notification: payload.notification,
-        data: payload.data,
-      });
+        data: {
+          // Extract from payload.data (all values are strings in FCM)
+          projectId: payload.data?.projectId || "",
+          projectName: payload.data?.projectName || "",
+          taskId: payload.data?.taskId || "",
+          taskName: payload.data?.taskName || "",
+          createdBy: payload.data?.createdBy || payload.data?.addedBy || "",
+          createdByName: payload.data?.createdByName || "",
+          createdByUID: payload.data?.createdByUID || "",
+          link: payload.data?.link || "",
+          type: payload.data?.type || "",
+          // Also include original data for backward compatibility
+          ...payload.data,
+        },
+      };
+
+      console.log("📨 Notification data extracted:", notificationData);
+      console.log("   User:", notificationData.data.createdBy || notificationData.data.createdByName);
+      console.log("   Task:", notificationData.data.taskName);
+      
+      // Show custom WhatsApp-style popup notification
+      showNotification(notificationData);
       
       console.log("✅ Custom popup notification triggered with sound");
     });

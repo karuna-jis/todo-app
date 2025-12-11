@@ -18,13 +18,39 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
 
   const showNotification = useCallback((notification) => {
-    const id = Date.now() + Math.random();
+    // Generate unique ID based on notification content to prevent duplicates
+    const taskId = notification.data?.taskId || "";
+    const projectId = notification.data?.projectId || "";
+    const timestamp = notification.data?.timestamp || Date.now();
+    
+    // Create unique ID: taskId + projectId + timestamp (if same task, same ID)
+    const uniqueId = taskId && projectId 
+      ? `${projectId}-${taskId}-${timestamp}`
+      : Date.now() + Math.random();
+    
     const newNotification = {
-      id,
+      id: uniqueId,
       ...notification,
     };
 
-    setNotifications((prev) => [...prev, newNotification]);
+    // Prevent duplicate notifications (same taskId + projectId within 2 seconds)
+    setNotifications((prev) => {
+      // Check if this notification already exists (same taskId + projectId)
+      if (taskId && projectId) {
+        const existing = prev.find(n => {
+          const nTaskId = n.data?.taskId || "";
+          const nProjectId = n.data?.projectId || "";
+          return nTaskId === taskId && nProjectId === projectId;
+        });
+        
+        if (existing) {
+          console.log("⚠️ Duplicate notification prevented:", taskId);
+          return prev; // Don't add duplicate
+        }
+      }
+      
+      return [...prev, newNotification];
+    });
   }, []);
 
   const removeNotification = useCallback((id) => {

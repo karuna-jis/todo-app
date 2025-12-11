@@ -79,12 +79,27 @@ const NotificationPopup = ({ notification, onClose }) => {
   if (!notification) return null;
 
   // Extract notification data - check both notification and data fields
+  // FCM sends all data values as strings, so we handle them properly
   const title = notification.notification?.title || notification.data?.title || "New Task Created";
   const body = notification.notification?.body || notification.data?.body || "A new task has been created";
   const projectName = notification.data?.projectName || "";
-  const createdByName = notification.data?.createdByName || "";
-  const createdByEmail = notification.data?.createdBy || ""; // User email
-  const taskName = notification.data?.taskName || ""; // Task content
+  
+  // User information - check multiple possible fields
+  const createdByName = notification.data?.createdByName || notification.data?.addedByName || "";
+  const createdByEmail = notification.data?.createdBy || notification.data?.addedBy || ""; // User email
+  
+  // Task content - check multiple possible fields
+  const taskName = notification.data?.taskName || notification.data?.taskText || notification.data?.text || "";
+  
+  console.log("📋 NotificationPopup - Extracted data:", {
+    title,
+    body,
+    projectName,
+    createdByName,
+    createdByEmail,
+    taskName,
+    fullData: notification.data
+  });
 
   return (
     <div
