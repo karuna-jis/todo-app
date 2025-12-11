@@ -78,10 +78,13 @@ const NotificationPopup = ({ notification, onClose }) => {
 
   if (!notification) return null;
 
+  // Extract notification data - check both notification and data fields
   const title = notification.notification?.title || notification.data?.title || "New Task Created";
   const body = notification.notification?.body || notification.data?.body || "A new task has been created";
   const projectName = notification.data?.projectName || "";
   const createdByName = notification.data?.createdByName || "";
+  const createdByEmail = notification.data?.createdBy || ""; // User email
+  const taskName = notification.data?.taskName || ""; // Task content
 
   return (
     <div
@@ -110,12 +113,27 @@ const NotificationPopup = ({ notification, onClose }) => {
           </button>
         </div>
         <div className="notification-popup-body">
-          {createdByName && (
+          {/* Show user email and name */}
+          {(createdByEmail || createdByName) && (
             <div className="notification-popup-author">
-              <i className="bi bi-person-fill"></i> {createdByName}
+              <i className="bi bi-person-fill"></i> 
+              {createdByName ? (
+                <span>{createdByName} {createdByEmail && <span className="notification-popup-email">({createdByEmail})</span>}</span>
+              ) : (
+                <span>{createdByEmail}</span>
+              )}
             </div>
           )}
-          <div className="notification-popup-message">{body}</div>
+          {/* Show task content */}
+          <div className="notification-popup-message">
+            {taskName ? (
+              <>
+                <strong>Task:</strong> {taskName}
+              </>
+            ) : (
+              body
+            )}
+          </div>
         </div>
       </div>
     </div>

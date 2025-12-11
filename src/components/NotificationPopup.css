@@ -114,10 +114,18 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-weight: 500;
 }
 
 .notification-popup-author i {
   font-size: 12px;
+}
+
+.notification-popup-email {
+  font-size: 11px;
+  color: #888;
+  font-weight: normal;
+  margin-left: 4px;
 }
 
 .notification-popup-message {
@@ -125,6 +133,11 @@
   color: #374151;
   line-height: 1.5;
   word-wrap: break-word;
+}
+
+.notification-popup-message strong {
+  color: #2a8c7b;
+  font-weight: 600;
 }
 
 /* Mobile Responsive */
