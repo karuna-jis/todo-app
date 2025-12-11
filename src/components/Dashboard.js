@@ -93,25 +93,51 @@ export default function Dashboard() {
         uid: user.uid
       });
 
+      // Ensure user document exists in Firestore before initializing FCM
       try {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
           setUserRole(snap.data().role || "user");
+          console.log("✅ User document exists in Firestore");
         } else {
+          // Create user document if it doesn't exist
+          console.log("📝 User document not found, creating...");
           setUserRole("user");
+          await setDoc(ref, {
+            email: user.email || "",
+            username: user.email?.split("@")[0] || "User",
+            role: "user",
+            createdAt: serverTimestamp(),
+          }, { merge: true });
+          console.log("✅ User document created in Firestore");
         }
       } catch (err) {
-        console.error("Error fetching user doc:", err);
+        console.error("❌ Error fetching/creating user doc:", err);
         setUserRole("user");
+        // Try to create user document even if fetch failed
+        try {
+          const ref = doc(db, "users", user.uid);
+          await setDoc(ref, {
+            email: user.email || "",
+            username: user.email?.split("@")[0] || "User",
+            role: "user",
+            createdAt: serverTimestamp(),
+          }, { merge: true });
+          console.log("✅ User document created (fallback)");
+        } catch (createErr) {
+          console.error("❌ Failed to create user document:", createErr);
+        }
       }
 
       // Initialize FCM token for push notifications
       // Enhanced initialization with multiple retries for new users
+      // IMPORTANT: This runs for ALL users (admin and regular users)
       if (user.uid) {
         console.log("🔄 User logged in, initializing FCM token...");
         console.log("   User UID:", user.uid);
         console.log("   User Email:", user.email);
+        console.log("   User Role:", userRole || "user (will be set)");
         
         // Wait for page to be fully loaded and service worker to register
         const initializeFCM = async () => {
