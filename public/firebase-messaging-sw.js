@@ -29,8 +29,8 @@ const urlsToCache = [
   '/',
   '/dashboard',
   '/manifest.json',
-  '/logo192.png',
-  '/logo512.png',
+  '/icons/iconn.png',
+  '/icons/icon.png',
   '/icons/icon.png',
   '/icons/iconn.png',
   '/static/js/bundle.js',
@@ -137,8 +137,8 @@ messaging.onBackgroundMessage((payload) => {
   // Build notification options
   const notificationOptions = {
     body: notificationBody,
-    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/logo192.png",
-    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/logo192.png",
+    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/iconn.png",
+    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/iconn.png",
     sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
     data: {
       ...payload.data,
@@ -177,8 +177,8 @@ messaging.onBackgroundMessage((payload) => {
       // Try again with minimal options if first attempt fails
       return self.registration.showNotification(notificationTitle, {
         body: notificationBody,
-        icon: "/logo192.png",
-        badge: "/logo192.png",
+        icon: "/icons/iconn.png",
+        badge: "/icons/iconn.png",
         data: payload.data || {}
       });
     });
@@ -207,8 +207,8 @@ self.addEventListener("push", (event) => {
   
   const notificationOptions = {
     body: notificationBody,
-    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/logo192.png",
-    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/logo192.png",
+    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/iconn.png",
+    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/iconn.png",
     sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
     vibrate: [200, 100, 200],
     silent: false, // CRITICAL: Must be false for sound
