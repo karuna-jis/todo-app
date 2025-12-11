@@ -63,9 +63,6 @@ export default function Dashboard() {
   // NOTIFICATIONS STATE
   const [notifications, setNotifications] = useState([]);
   const [projectNotificationCounts, setProjectNotificationCounts] = useState({});
-  
-  // ADMIN TASK LIST STATE (Real-time task list for admin)
-  const [adminTasks, setAdminTasks] = useState([]); // { projectId, projectName, taskId, taskName, addedBy, timestamp }
 
   // Check if mobile/tablet screen (max-width: 992px)
   useEffect(() => {
@@ -211,16 +208,7 @@ export default function Dashboard() {
                 const success = await initializeFCMToken(user.uid);
                 if (success) {
                   console.log("✅ FCM token initialized successfully!");
-                  // Show success message
-                  Swal.fire({
-                    toast: true,
-                    position: "top-end",
-                    icon: "success",
-                    title: "Notifications Enabled",
-                    text: "You will now receive push notifications",
-                    timer: 3000,
-                    showConfirmButton: false
-                  });
+                  // No toast - silent initialization
                   return true;
                 } else {
                   console.warn(`⚠️ Attempt ${attempt} failed, will retry...`);
@@ -280,76 +268,24 @@ export default function Dashboard() {
 
   // Handle foreground FCM messages (when app is open)
   useEffect(() => {
-    if (!messaging || !onMessage) {
-      console.warn("⚠️ FCM messaging not available for foreground messages");
-      return;
-    }
-
-    console.log("✅ Setting up FCM foreground message listener");
+    if (!messaging || !onMessage) return;
 
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("📨 Foreground FCM message received:", payload);
-      console.log("   Notification:", payload.notification);
-      console.log("   Data:", payload.data);
-      
-      // Play notification sound (WhatsApp-style)
-      try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGW67+efTQ8MTqfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBhluu/nn00PDE6n4/C2YxwGOJHX8sx5LAUkd8fw3ZBAC');
-        audio.volume = 0.7;
-        audio.play().catch(err => {
-          // Fallback: Use Web Audio API for simple beep
-          try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.3);
-          } catch (audioErr) {
-            console.log("Could not play sound:", audioErr);
-          }
-        });
-      } catch (error) {
-        console.log("Sound playback error:", error);
-      }
-      
-      // Extract data from FCM payload
-      // FCM sends data as strings, so we need to parse them properly
-      const notificationData = {
-        notification: payload.notification,
-        data: {
-          // Extract from payload.data (all values are strings in FCM)
-          projectId: payload.data?.projectId || "",
-          projectName: payload.data?.projectName || "",
-          taskId: payload.data?.taskId || "",
-          taskName: payload.data?.taskName || "",
-          createdBy: payload.data?.createdBy || payload.data?.addedBy || "",
-          createdByName: payload.data?.createdByName || "",
-          createdByUID: payload.data?.createdByUID || "",
-          link: payload.data?.link || "",
-          type: payload.data?.type || "",
-          // Also include original data for backward compatibility
-          ...payload.data,
-        },
-      };
+      const addedBy = payload.data?.addedByName || payload.data?.addedBy || payload.data?.createdBy || "Unknown";
+      const taskName = payload.data?.taskName || "New Task";
 
-      console.log("📨 Notification data extracted:", notificationData);
-      console.log("   User:", notificationData.data.createdBy || notificationData.data.createdByName);
-      console.log("   Task:", notificationData.data.taskName);
-      
-      // Show custom WhatsApp-style popup notification
-      showNotification(notificationData);
-      
-      console.log("✅ Custom popup notification triggered with sound");
+      showNotification({
+        title: "New Task Added",
+        body: `${addedBy} added new task: ${taskName}`,
+        projectId: payload.data?.projectId || "",
+        projectName: payload.data?.projectName || "",
+        taskId: payload.data?.taskId || "",
+        taskName: taskName,
+        addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+        addedByName: addedBy,
+        link: payload.data?.link || "",
+        timestamp: payload.data?.timestamp || Date.now(),
+      });
     });
 
     return () => {
@@ -416,17 +352,13 @@ export default function Dashboard() {
     return () => unsub();
   }, [userUID, userEmail]);
 
-  // LOAD REAL-TIME TASKS FOR ADMIN (shows all tasks from all projects)
+  // REALTIME TASK LISTENER - Show popup when new task added
   useEffect(() => {
-    if (!userUID || userRole !== "admin" || projects.length === 0) {
-      setAdminTasks([]);
-      return;
-    }
+    if (!userUID || projects.length === 0) return;
 
-    console.log("📋 Loading real-time tasks for admin...");
     const unsubscribers = [];
+    const lastTaskIds = {};
 
-    // Listen to tasks from all projects
     projects.forEach((project) => {
       const tasksRef = collection(db, "projects", project.id, "tasks");
       const q = query(tasksRef, orderBy("createdAt", "desc"));
@@ -434,28 +366,37 @@ export default function Dashboard() {
       const unsub = onSnapshot(
         q,
         (snapshot) => {
-          const projectTasks = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            projectId: project.id,
-            projectName: project.name,
-            ...docSnap.data(),
-          }));
+          snapshot.docs.forEach((docSnap) => {
+            const taskData = docSnap.data();
+            const taskId = docSnap.id;
+            const projectId = project.id;
+            const key = `${projectId}-${taskId}`;
 
-          // Update admin tasks list
-          setAdminTasks((prev) => {
-            // Remove old tasks from this project
-            const filtered = prev.filter((t) => t.projectId !== project.id);
-            // Add new tasks from this project
-            return [...filtered, ...projectTasks].sort((a, b) => {
-              // Sort by timestamp (newest first)
-              const aTime = a.createdAt?.toMillis?.() || 0;
-              const bTime = b.createdAt?.toMillis?.() || 0;
-              return bTime - aTime;
-            });
+            if (!lastTaskIds[key]) {
+              lastTaskIds[key] = true;
+              const taskCreatedBy = taskData.createdBy || "";
+              if (taskCreatedBy === userEmail) return;
+
+              const addedBy = taskData.createdBy || taskData.createdByName || "Unknown";
+              const taskName = taskData.text || taskData.taskName || "New Task";
+
+              showNotification({
+                title: "New Task Added",
+                body: `${addedBy} added new task: ${taskName}`,
+                projectId: projectId,
+                projectName: project.name,
+                taskId: taskId,
+                taskName: taskName,
+                addedBy: addedBy,
+                addedByName: taskData.createdByName || addedBy,
+                link: `/view/${projectId}/${encodeURIComponent(project.name)}`,
+                timestamp: taskData.createdAt?.toMillis?.() || Date.now(),
+              });
+            }
           });
         },
         (error) => {
-          console.error(`Error loading tasks for project ${project.id}:`, error);
+          console.error(`Error listening to tasks for project ${project.id}:`, error);
         }
       );
 
@@ -465,7 +406,7 @@ export default function Dashboard() {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [userUID, userRole, projects]);
+  }, [userUID, userEmail, projects, showNotification]);
 
   // LOAD ALL USERS (for assign & list)
   useEffect(() => {

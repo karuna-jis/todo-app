@@ -210,18 +210,14 @@ const addTask = async () => {
         // Since creator is already in seenBy, they won't see the badge
       });
       
-      // Send push notification to admin via Node.js backend API
+      // Send notification via backend
       try {
         const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
                       (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
                         ? "http://localhost:3001"
                         : "https://todo-server-xvr8.onrender.com");
         
-        console.log(`📤 Sending task notification to admin`);
-        console.log(`🔗 Backend API URL: ${API_URL}`);
-        
-        // Call backend API to send notification to admin
-        const response = await fetch(`${API_URL}/send-task-notification`, {
+        await fetch(`${API_URL}/notify-task`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -229,37 +225,16 @@ const addTask = async () => {
           body: JSON.stringify({
             projectId: projectId,
             addedBy: userEmail,
+            addedByName: userName,
             taskName: taskText.trim(),
             taskId: taskDocRef.id,
             origin: window.location.origin,
           }),
+        }).catch(err => {
+          console.error("Notification send failed:", err);
         });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ Backend API error (${response.status}):`, errorText);
-          try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson.error?.includes("no FCM token")) {
-              console.warn("⚠️ Admin has no FCM token. Admin needs to login and allow notifications.");
-            }
-          } catch (e) {
-            // Not JSON error
-          }
-        } else {
-          const result = await response.json();
-          if (result.success) {
-            console.log(`✅ Push notification sent to admin: ${result.adminEmail}`);
-            console.log(`   Message ID: ${result.messageId}`);
-          } else {
-            console.error("❌ Failed to send push notification:", result.error);
-          }
-        }
-      } catch (fetchError) {
-        console.error("❌ Error calling backend API:", fetchError);
-        console.error("   Make sure backend server is running at:", API_URL);
-        console.error("   Check if CORS is configured correctly");
-        // Don't block task creation if FCM fails
+      } catch (err) {
+        console.error("Error sending notification:", err);
       }
     } catch (error) {
       console.error("Error creating notification:", error);

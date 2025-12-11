@@ -1,6 +1,3 @@
-// Global Notification Context
-// Manages notification popups across all pages
-
 import React, { createContext, useContext, useState, useCallback } from "react";
 import NotificationPopup from "../components/NotificationPopup";
 
@@ -17,38 +14,43 @@ export const useNotification = () => {
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
 
-  const showNotification = useCallback((notification) => {
-    // Generate unique ID based on notification content to prevent duplicates
-    const taskId = notification.data?.taskId || "";
-    const projectId = notification.data?.projectId || "";
-    const timestamp = notification.data?.timestamp || Date.now();
+  const showNotification = useCallback((message) => {
+    if (!message) return;
+
+    const taskId = message.taskId || "";
+    const projectId = message.projectId || "";
+    const timestamp = message.timestamp || Date.now();
     
-    // Create unique ID: taskId + projectId + timestamp (if same task, same ID)
     const uniqueId = taskId && projectId 
       ? `${projectId}-${taskId}-${timestamp}`
       : Date.now() + Math.random();
     
     const newNotification = {
       id: uniqueId,
-      ...notification,
+      notification: {
+        title: message.title || "New Task Added",
+        body: message.body || "",
+      },
+      data: {
+        projectId: message.projectId || "",
+        projectName: message.projectName || "",
+        taskId: message.taskId || "",
+        taskName: message.taskName || "",
+        createdBy: message.addedBy || message.createdBy || "",
+        createdByName: message.addedByName || message.createdByName || "",
+        link: message.link || "",
+      },
     };
 
-    // Prevent duplicate notifications (same taskId + projectId within 2 seconds)
     setNotifications((prev) => {
-      // Check if this notification already exists (same taskId + projectId)
       if (taskId && projectId) {
         const existing = prev.find(n => {
           const nTaskId = n.data?.taskId || "";
           const nProjectId = n.data?.projectId || "";
           return nTaskId === taskId && nProjectId === projectId;
         });
-        
-        if (existing) {
-          console.log("⚠️ Duplicate notification prevented:", taskId);
-          return prev; // Don't add duplicate
-        }
+        if (existing) return prev;
       }
-      
       return [...prev, newNotification];
     });
   }, []);
@@ -60,7 +62,6 @@ export const NotificationProvider = ({ children }) => {
   return (
     <NotificationContext.Provider value={{ showNotification }}>
       {children}
-      {/* Render all active notifications */}
       <div className="notification-popup-container">
         {notifications.map((notification) => (
           <NotificationPopup
@@ -73,4 +74,3 @@ export const NotificationProvider = ({ children }) => {
     </NotificationContext.Provider>
   );
 };
-
