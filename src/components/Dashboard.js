@@ -841,6 +841,20 @@ export default function Dashboard() {
   }, [userUID, userEmail, projects]);
 
   // RENDER
+  // Show loading screen until auth check is complete
+  if (!authChecked) {
+    return (
+      <div className="container-fluid p-0 d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container-fluid p-0">
       {/* HEADER */}
