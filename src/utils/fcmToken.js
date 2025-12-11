@@ -190,14 +190,15 @@ export const saveFCMTokenToFirestore = async (userUID, token) => {
  */
 const waitForServiceWorker = async () => {
   if (!("serviceWorker" in navigator)) {
-    console.warn("⚠️ Service Worker not supported in this browser");
+    console.error("❌ Service Worker not supported in this browser");
+    console.error("   FCM requires service worker support");
     return false;
   }
 
   try {
-    // First, check if service worker is already registered
+    // First, check if service worker is already active
     if (navigator.serviceWorker.controller) {
-      console.log("✅ Service worker is already active");
+      console.log("   ✅ Service worker is already active");
       return true;
     }
 
@@ -205,7 +206,7 @@ const waitForServiceWorker = async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
       if (registration && registration.active) {
-        console.log("✅ Service worker is ready");
+        console.log("   ✅ Service worker is ready");
         return true;
       }
     } catch (error) {
@@ -215,38 +216,57 @@ const waitForServiceWorker = async () => {
     // Register service worker if not registered
     if (!navigator.serviceWorker.controller) {
       try {
-        console.log("   Registering service worker...");
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        console.log("   Service worker registered, waiting for activation...");
+        console.log("   Registering service worker at /firebase-messaging-sw.js...");
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/'
+        });
+        console.log("   Service worker registered, scope:", registration.scope);
         
         // Wait for activation
         if (registration.installing) {
-          await new Promise((resolve) => {
+          console.log("   Service worker is installing...");
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error("Service worker installation timeout"));
+            }, 10000); // 10 second timeout
+            
             registration.installing.addEventListener('statechange', function() {
               if (this.state === 'activated') {
+                clearTimeout(timeout);
+                console.log("   ✅ Service worker activated");
                 resolve();
+              } else if (this.state === 'redundant') {
+                clearTimeout(timeout);
+                reject(new Error("Service worker became redundant"));
               }
             });
           });
         } else if (registration.waiting) {
-          // If waiting, try to activate it
+          console.log("   Service worker is waiting, trying to activate...");
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          // Wait a bit for activation
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else if (registration.active) {
+          console.log("   ✅ Service worker is already active");
+          return true;
         }
       } catch (error) {
-        console.warn("   Could not register service worker:", error.message);
+        console.error("   ❌ Could not register service worker:", error.message);
+        console.error("   Error details:", error);
+        return false;
       }
     }
 
     // Wait for service worker to be ready with timeout
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 15; // Increased attempts
+      const maxAttempts = 20; // Increased attempts (10 seconds total)
       const checkInterval = setInterval(async () => {
         attempts++;
         try {
           if (navigator.serviceWorker.controller) {
             clearInterval(checkInterval);
-            console.log("✅ Service worker is ready (after wait)");
+            console.log("   ✅ Service worker is ready (after wait)");
             resolve(true);
             return;
           }
@@ -254,7 +274,7 @@ const waitForServiceWorker = async () => {
           const registration = await navigator.serviceWorker.ready;
           if (registration && registration.active) {
             clearInterval(checkInterval);
-            console.log("✅ Service worker is ready (after wait)");
+            console.log("   ✅ Service worker is ready (after wait)");
             resolve(true);
             return;
           }
@@ -264,15 +284,20 @@ const waitForServiceWorker = async () => {
         
         if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
-          console.warn("⚠️ Service worker not ready after waiting");
-          console.warn("   This might be a new user's first visit");
-          console.warn("   Service worker will be ready on next page load");
+          console.error("   ❌ Service worker not ready after waiting");
+          console.error("   Waited for", maxAttempts * 0.5, "seconds");
+          console.error("   Possible issues:");
+          console.error("   1. firebase-messaging-sw.js not accessible");
+          console.error("   2. Browser blocking service worker");
+          console.error("   3. Not running on HTTPS or localhost");
+          console.error("   💡 Try refreshing the page");
           resolve(false);
         }
       }, 500);
     });
   } catch (error) {
     console.error("❌ Error waiting for service worker:", error);
+    console.error("   Error details:", error.message);
     return false;
   }
 };

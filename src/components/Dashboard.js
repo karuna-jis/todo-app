@@ -110,43 +110,76 @@ export default function Dashboard() {
         console.log("   User UID:", user.uid);
         console.log("   User Email:", user.email);
         
-        // Initialize FCM token with retry mechanism
-        const initializeWithRetry = async (retries = 3, delay = 2000) => {
-          for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-              console.log(`   Attempt ${attempt}/${retries}...`);
-              await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Progressive delay
-              const success = await initializeFCMToken(user.uid);
-              if (success) {
-                console.log("✅ FCM token initialized successfully");
-                return;
+        // Wait for page to be fully loaded and service worker to register
+        const initializeFCM = async () => {
+          // Wait for DOM to be ready
+          if (document.readyState !== 'complete') {
+            await new Promise(resolve => {
+              if (document.readyState === 'complete') {
+                resolve();
               } else {
-                console.warn(`⚠️ Attempt ${attempt} failed, will retry...`);
+                window.addEventListener('load', resolve);
               }
-            } catch (error) {
-              console.error(`❌ Attempt ${attempt} error:`, error.message);
-              if (attempt === retries) {
-                console.error("❌ FCM token initialization failed after all retries");
-                console.warn("💡 User can manually register token by running: registerFCMToken()");
-                // Show user-friendly message
-                Swal.fire({
-                  toast: true,
-                  position: "top-end",
-                  icon: "info",
-                  title: "Enable notifications for push alerts",
-                  text: "Click the lock icon in address bar → Allow notifications",
-                  timer: 5000,
-                  showConfirmButton: false
-                });
+            });
+          }
+          
+          // Additional delay to ensure service worker registration from index.html completes
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Initialize FCM token with retry mechanism
+          const initializeWithRetry = async (retries = 5, delay = 3000) => {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+              try {
+                console.log(`\n🔄 FCM Token Initialization - Attempt ${attempt}/${retries}`);
+                console.log("   Waiting before attempt...");
+                
+                // Progressive delay between attempts
+                if (attempt > 1) {
+                  await new Promise(resolve => setTimeout(resolve, delay * (attempt - 1)));
+                }
+                
+                const success = await initializeFCMToken(user.uid);
+                if (success) {
+                  console.log("✅ FCM token initialized successfully!");
+                  return true;
+                } else {
+                  console.warn(`⚠️ Attempt ${attempt} failed, will retry...`);
+                  if (attempt < retries) {
+                    console.log(`   Next retry in ${delay * attempt / 1000} seconds...`);
+                  }
+                }
+              } catch (error) {
+                console.error(`❌ Attempt ${attempt} error:`, error.message);
+                if (attempt === retries) {
+                  console.error("❌ FCM token initialization failed after all retries");
+                  console.warn("💡 Troubleshooting:");
+                  console.warn("   1. Check browser console for detailed errors");
+                  console.warn("   2. Run: window.checkFCMStatus() to diagnose");
+                  console.warn("   3. Run: window.registerFCMToken() to manually register");
+                  
+                  // Show user-friendly message only if permission is the issue
+                  if (Notification.permission === "default" || Notification.permission === "denied") {
+                    Swal.fire({
+                      toast: true,
+                      position: "top-end",
+                      icon: "info",
+                      title: "Enable notifications for push alerts",
+                      text: "Click the lock icon in address bar → Allow notifications",
+                      timer: 5000,
+                      showConfirmButton: false
+                    });
+                  }
+                }
               }
             }
-          }
+            return false;
+          };
+          
+          await initializeWithRetry();
         };
         
-        // Start initialization after a short delay to ensure page is fully loaded
-        setTimeout(() => {
-          initializeWithRetry();
-        }, 1500); // Initial delay for service worker registration
+        // Start initialization
+        initializeFCM();
       }
     });
 
