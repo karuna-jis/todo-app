@@ -15,16 +15,16 @@ import ProjectBoard from "./components/ProjectBoard.js";
 
 function App() {
   return (
-    <NotificationProvider>
-      <Router>
+    <Router>
+      <NotificationProvider>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/view/:projectId/:projectName" element={<ViewTaskPage />} />
           <Route path="/board/:projectId/:projectName" element={<ProjectBoard />} />
         </Routes>
-      </Router>
-    </NotificationProvider>
+      </NotificationProvider>
+    </Router>
   );
 }
 
