@@ -22,13 +22,14 @@ import {
   setDoc,
 } from "firebase/firestore";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showNotification } = useNotification();
 
   // AUTH STATES
@@ -83,53 +84,76 @@ export default function Dashboard() {
   useEffect(() => {
     let isMounted = true;
     let hasAuthenticated = false;
+    let authTime = null; // Track when user authenticated
+    let navigationTimeout = null;
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        // Clear any pending navigation
+        if (navigationTimeout) {
+          clearTimeout(navigationTimeout);
+          navigationTimeout = null;
+        }
+        
         // Mark auth check as complete
         if (isMounted) {
           setAuthChecked(true);
         }
-        // Only navigate if we were previously authenticated (to prevent flicker on initial load)
-        if (hasAuthenticated && isMounted) {
-          navigate("/");
+        
+        // Only navigate if:
+        // 1. We were previously authenticated
+        // 2. At least 3 seconds have passed since authentication (to prevent premature navigation)
+        // 3. We're currently on the dashboard route
+        if (hasAuthenticated && isMounted && authTime) {
+          const timeSinceAuth = Date.now() - authTime;
+          const minTimeBeforeLogout = 3000; // 3 seconds minimum
+          
+          if (timeSinceAuth >= minTimeBeforeLogout && location.pathname === "/dashboard") {
+            console.log("🔄 User logged out, navigating to login...");
+            navigate("/");
+          } else {
+            console.log("⏸️ Preventing premature navigation (too soon after login)");
+          }
         }
         return;
       }
 
       // Mark that we've authenticated at least once
       hasAuthenticated = true;
+      authTime = Date.now(); // Record authentication time
       
       if (!isMounted) return;
 
-      setUserEmail(user.email || "");
-      setUserUID(user.uid || "");
-      setAuthChecked(true); // Mark auth check as complete
-      console.log("👤 User authenticated:", {
-        email: user.email,
-        uid: user.uid
-      });
-
-      // Ensure user document exists in Firestore before initializing FCM
+      // Wrap all async operations in try-catch to prevent errors from causing navigation issues
       try {
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setUserRole(snap.data().role || "user");
-          console.log("✅ User document exists in Firestore");
-        } else {
-          // Create user document if it doesn't exist
-          console.log("📝 User document not found, creating...");
-          setUserRole("user");
-          await setDoc(ref, {
-            email: user.email || "",
-            username: user.email?.split("@")[0] || "User",
-            role: "user",
-            createdAt: serverTimestamp(),
-          }, { merge: true });
-          console.log("✅ User document created in Firestore");
-        }
-      } catch (err) {
+        setUserEmail(user.email || "");
+        setUserUID(user.uid || "");
+        setAuthChecked(true); // Mark auth check as complete
+        console.log("👤 User authenticated:", {
+          email: user.email,
+          uid: user.uid
+        });
+
+        // Ensure user document exists in Firestore before initializing FCM
+        try {
+          const ref = doc(db, "users", user.uid);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            setUserRole(snap.data().role || "user");
+            console.log("✅ User document exists in Firestore");
+          } else {
+            // Create user document if it doesn't exist
+            console.log("📝 User document not found, creating...");
+            setUserRole("user");
+            await setDoc(ref, {
+              email: user.email || "",
+              username: user.email?.split("@")[0] || "User",
+              role: "user",
+              createdAt: serverTimestamp(),
+            }, { merge: true });
+            console.log("✅ User document created in Firestore");
+          }
+        } catch (err) {
         console.error("❌ Error fetching/creating user doc:", err);
         setUserRole("user");
         // Try to create user document even if fetch failed
@@ -278,16 +302,30 @@ export default function Dashboard() {
           await initializeWithRetry();
         };
         
-        // Start initialization
-        initializeFCM();
+        // Start initialization (don't await - run in background)
+        initializeFCM().catch((err) => {
+          console.error("❌ FCM initialization error:", err);
+          // Don't navigate on FCM errors - just log them
+        });
+      }
+      } catch (error) {
+        // Catch any unhandled errors in the auth callback
+        console.error("❌ Error in auth callback:", error);
+        // Don't navigate on errors - user should stay on dashboard
+        if (isMounted) {
+          setAuthChecked(true);
+        }
       }
     });
 
     return () => {
       isMounted = false;
+      if (navigationTimeout) {
+        clearTimeout(navigationTimeout);
+      }
       unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Handle foreground FCM messages (when app is open)
   useEffect(() => {
