@@ -24,10 +24,12 @@ messaging.onBackgroundMessage((payload) => {
     body: payload.notification?.body || payload.data?.body || "A new task was added",
     icon: payload.notification?.icon || "/logo192.png",
     badge: "/logo192.png",
-    sound: "default",
+    sound: "default", // WhatsApp-style sound (browser will play default notification sound)
     data: payload.data || {},
     tag: payload.data?.taskId || "task-update",
-    requireInteraction: false
+    requireInteraction: false,
+    vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
+    silent: false // Ensure sound is not silenced
   };
 
   return self.registration.showNotification(notificationTitle, notificationOptions);

@@ -200,13 +200,43 @@ export default function Dashboard() {
       console.log("   Notification:", payload.notification);
       console.log("   Data:", payload.data);
       
+      // Play notification sound (WhatsApp-style)
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGW67+efTQ8MTqfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBhluu/nn00PDE6n4/C2YxwGOJHX8sx5LAUkd8fw3ZBAC');
+        audio.volume = 0.7;
+        audio.play().catch(err => {
+          // Fallback: Use Web Audio API for simple beep
+          try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+          } catch (audioErr) {
+            console.log("Could not play sound:", audioErr);
+          }
+        });
+      } catch (error) {
+        console.log("Sound playback error:", error);
+      }
+      
       // Show custom WhatsApp-style popup notification
       showNotification({
         notification: payload.notification,
         data: payload.data,
       });
       
-      console.log("✅ Custom popup notification triggered");
+      console.log("✅ Custom popup notification triggered with sound");
     });
 
     return () => {

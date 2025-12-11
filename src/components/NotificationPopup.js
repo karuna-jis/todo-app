@@ -11,6 +11,43 @@ const NotificationPopup = ({ notification, onClose }) => {
   const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
+    // Play notification sound (WhatsApp-style)
+    const playNotificationSound = () => {
+      try {
+        // Create audio element for notification sound
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGW67+efTQ8MTqfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBhluu/nn00PDE6n4/C2YxwGOJHX8sx5LAUkd8fw3ZBAC');
+        audio.volume = 0.7; // Set volume (0.0 to 1.0)
+        audio.play().catch(err => {
+          console.log("Could not play notification sound:", err);
+          // Fallback: Use Web Audio API for simple beep
+          try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800; // Higher pitch like WhatsApp
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+          } catch (audioErr) {
+            console.log("Could not play fallback sound:", audioErr);
+          }
+        });
+      } catch (error) {
+        console.log("Sound playback error:", error);
+      }
+    };
+
+    // Play sound immediately when notification appears
+    playNotificationSound();
+
     // Slide in animation
     setTimeout(() => setIsVisible(true), 10);
 
