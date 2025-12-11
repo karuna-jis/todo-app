@@ -12,8 +12,16 @@ const firebaseConfig = {
   measurementId: "G-259PEFN7CL"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
+
+// Log service worker initialization
+console.log("[SW] ===== SERVICE WORKER INITIALIZED =====");
+console.log("[SW] Firebase initialized");
+console.log("[SW] Messaging initialized");
+console.log("[SW] Service worker scope:", self.registration?.scope || "unknown");
+console.log("[SW] Service worker ready to handle background notifications");
 
 // PWA Offline Caching
 const CACHE_NAME = 'todo-app-v2';
@@ -114,58 +122,121 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Background notifications
+// Background notifications - This handles notifications when app is CLOSED
 messaging.onBackgroundMessage((payload) => {
-  console.log("[SW] Background message received:", payload);
-  console.log("[SW] Notification payload:", JSON.stringify(payload, null, 2));
+  console.log("[SW] ===== BACKGROUND MESSAGE RECEIVED (App Closed) =====");
+  console.log("[SW] Full payload:", JSON.stringify(payload, null, 2));
+  console.log("[SW] Notification object:", payload.notification);
+  console.log("[SW] Data object:", payload.data);
+  console.log("[SW] Webpush object:", payload.webpush);
 
-  const notificationTitle = payload.notification?.title || "New Task Created";
+  // Extract notification details - prioritize notification object, fallback to data
+  const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
+  const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+  
+  // Build notification options
   const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || "A new task was added",
-    icon: payload.notification?.icon || "/logo192.png",
-    badge: "/logo192.png",
-    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // System default sound
-    data: payload.data || {},
-    tag: payload.data?.taskId || "task-update",
+    body: notificationBody,
+    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/logo192.png",
+    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/logo192.png",
+    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
+    data: {
+      ...payload.data,
+      // Ensure all data fields are preserved
+      projectId: payload.data?.projectId || "",
+      projectName: payload.data?.projectName || "",
+      taskId: payload.data?.taskId || "",
+      taskName: payload.data?.taskName || "",
+      addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+      addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
+      link: payload.fcmOptions?.link || payload.data?.link || ""
+    },
+    tag: payload.data?.taskId || `task-${Date.now()}`, // Unique tag to prevent duplicates
     requireInteraction: false,
-    vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
-    silent: false, // Ensure sound is not silenced
-    // Additional options for better sound support
+    vibrate: [200, 100, 200], // Vibration pattern for mobile
+    silent: false, // CRITICAL: Must be false for sound to play
     renotify: true,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    // Additional options for better mobile support
+    dir: "ltr",
+    lang: "en"
   };
 
-  console.log("[SW] Showing notification with options:", notificationOptions);
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  console.log("[SW] Notification title:", notificationTitle);
+  console.log("[SW] Notification body:", notificationBody);
+  console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+
+  // CRITICAL: Always show notification when app is closed
+  // Use waitUntil to ensure notification is shown even if service worker is busy
+  return self.registration.showNotification(notificationTitle, notificationOptions)
+    .then(() => {
+      console.log("[SW] ✅ Background notification shown successfully!");
+    })
+    .catch((error) => {
+      console.error("[SW] ❌ Error showing background notification:", error);
+      // Try again with minimal options if first attempt fails
+      return self.registration.showNotification(notificationTitle, {
+        body: notificationBody,
+        icon: "/logo192.png",
+        badge: "/logo192.png",
+        data: payload.data || {}
+      });
+    });
 });
 
-// Fallback: some browsers need this to support push
+// Fallback: Push event listener (for browsers that don't use FCM directly)
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
+  console.log("[SW] ===== PUSH EVENT RECEIVED =====");
+  
+  if (!event.data) {
+    console.log("[SW] ⚠️ Push event has no data");
+    return;
+  }
 
-  const payload = event.data.json();
-  console.log("[SW] Push event received:", payload);
-  console.log("[SW] Push payload:", JSON.stringify(payload, null, 2));
+  let payload;
+  try {
+    payload = event.data.json();
+    console.log("[SW] Push payload:", JSON.stringify(payload, null, 2));
+  } catch (e) {
+    console.log("[SW] Push data is not JSON, using text:", event.data.text());
+    payload = { data: { body: event.data.text() } };
+  }
 
-  const notificationTitle = payload.notification?.title || "Notification";
+  const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Added";
+  const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+  
   const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body,
-    icon: payload.notification?.icon || "/logo192.png",
-    badge: "/logo192.png",
-    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // System default sound
-    vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
-    silent: false, // Ensure sound is not silenced
-    data: payload.data || {},
-    tag: payload.data?.taskId || "task-update",
+    body: notificationBody,
+    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/logo192.png",
+    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/logo192.png",
+    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
+    vibrate: [200, 100, 200],
+    silent: false, // CRITICAL: Must be false for sound
+    data: {
+      ...payload.data,
+      projectId: payload.data?.projectId || "",
+      projectName: payload.data?.projectName || "",
+      taskId: payload.data?.taskId || "",
+      taskName: payload.data?.taskName || "",
+      link: payload.fcmOptions?.link || payload.data?.link || ""
+    },
+    tag: payload.data?.taskId || `task-${Date.now()}`,
     requireInteraction: false,
-    // Additional options for better sound support
     renotify: true,
     timestamp: Date.now()
   };
 
-  console.log("[SW] Showing push notification with options:", notificationOptions);
+  console.log("[SW] Showing push notification:", notificationTitle);
+  console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+
   event.waitUntil(
     self.registration.showNotification(notificationTitle, notificationOptions)
+      .then(() => {
+        console.log("[SW] ✅ Push notification shown successfully!");
+      })
+      .catch((error) => {
+        console.error("[SW] ❌ Error showing push notification:", error);
+      })
   );
 });
 
