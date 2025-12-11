@@ -4,7 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
 import { auth, db, secondaryAuth } from "./firebase";
 import "../App.css";
-import { signOut, onAuthStateChanged, createUserWithEmailAndPassword,signInWithEmailAndPassword,deleteUser as deleteAuthUser } from "firebase/auth";
+import { signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
 
 import {
   collection,

@@ -4,8 +4,7 @@ import "./App.css";
 import {
   BrowserRouter as Router,
   Routes,
-  Route,
-  useNavigate
+  Route
 } from "react-router-dom";
 
 import { NotificationProvider } from "./contexts/NotificationContext";

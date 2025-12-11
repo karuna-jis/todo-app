@@ -1,10 +1,7 @@
-
 // ViewTaskPage.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { auth, db } from "./firebase.js";
-
-
 
 import {
   collection,
