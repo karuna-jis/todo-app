@@ -117,20 +117,25 @@ self.addEventListener('fetch', (event) => {
 // Background notifications
 messaging.onBackgroundMessage((payload) => {
   console.log("[SW] Background message received:", payload);
+  console.log("[SW] Notification payload:", JSON.stringify(payload, null, 2));
 
   const notificationTitle = payload.notification?.title || "New Task Created";
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || "A new task was added",
     icon: payload.notification?.icon || "/logo192.png",
     badge: "/logo192.png",
-    sound: "default", // WhatsApp-style sound (browser will play default notification sound)
+    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // System default sound
     data: payload.data || {},
     tag: payload.data?.taskId || "task-update",
     requireInteraction: false,
     vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
-    silent: false // Ensure sound is not silenced
+    silent: false, // Ensure sound is not silenced
+    // Additional options for better sound support
+    renotify: true,
+    timestamp: Date.now()
   };
 
+  console.log("[SW] Showing notification with options:", notificationOptions);
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
@@ -139,21 +144,26 @@ self.addEventListener("push", (event) => {
   if (!event.data) return;
 
   const payload = event.data.json();
-  console.log("[SW] Push event:", payload);
+  console.log("[SW] Push event received:", payload);
+  console.log("[SW] Push payload:", JSON.stringify(payload, null, 2));
 
   const notificationTitle = payload.notification?.title || "Notification";
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body,
     icon: payload.notification?.icon || "/logo192.png",
     badge: "/logo192.png",
-    sound: "default",
+    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // System default sound
     vibrate: [200, 100, 200], // WhatsApp-style vibration pattern (for mobile)
     silent: false, // Ensure sound is not silenced
     data: payload.data || {},
     tag: payload.data?.taskId || "task-update",
-    requireInteraction: false
+    requireInteraction: false,
+    // Additional options for better sound support
+    renotify: true,
+    timestamp: Date.now()
   };
 
+  console.log("[SW] Showing push notification with options:", notificationOptions);
   event.waitUntil(
     self.registration.showNotification(notificationTitle, notificationOptions)
   );
