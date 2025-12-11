@@ -25,9 +25,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
+import { useNotification } from "../contexts/NotificationContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
 
   // AUTH STATES
   const [userEmail, setUserEmail] = useState("");
@@ -98,8 +100,27 @@ export default function Dashboard() {
       }
 
       // Initialize FCM token for push notifications
+      // Add delay to ensure service worker is ready
       if (user.uid) {
-        initializeFCMToken(user.uid);
+        console.log("🔄 User logged in, initializing FCM token...");
+        // Wait a bit for service worker to be ready
+        setTimeout(async () => {
+          try {
+            await initializeFCMToken(user.uid);
+          } catch (error) {
+            console.error("❌ Failed to initialize FCM token on login:", error);
+            // Retry after 2 seconds
+            setTimeout(async () => {
+              console.log("🔄 Retrying FCM token initialization...");
+              try {
+                await initializeFCMToken(user.uid);
+              } catch (retryError) {
+                console.error("❌ FCM token initialization failed after retry:", retryError);
+                console.warn("💡 User can manually register token by running: registerFCMToken()");
+              }
+            }, 2000);
+          }
+        }, 1000); // Wait 1 second for service worker
       }
     });
 
@@ -120,48 +141,19 @@ export default function Dashboard() {
       console.log("   Notification:", payload.notification);
       console.log("   Data:", payload.data);
       
-      // Show browser notification even when app is in foreground
-      if (Notification.permission === "granted") {
-        const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
-        const notificationBody = payload.notification?.body || payload.data?.body || "A new task has been created";
-        
-        const notificationOptions = {
-          body: notificationBody,
-          icon: payload.notification?.icon || "/logo192.png",
-          badge: "/logo192.png",
-          tag: payload.data?.taskId || "task-notification",
-          data: payload.data || {},
-        };
-
-        console.log("🔔 Showing browser notification:", notificationTitle);
-        
-        // Show notification
-        try {
-          const notification = new Notification(notificationTitle, notificationOptions);
-          console.log("✅ Browser notification shown successfully");
-          
-          // Handle notification click
-          notification.onclick = (event) => {
-            event.preventDefault();
-            const data = notification.data || {};
-            if (data.link) {
-              window.location.href = data.link;
-            }
-            notification.close();
-          };
-        } catch (error) {
-          console.error("❌ Error showing notification:", error);
-        }
-      } else {
-        console.warn("⚠️ Notification permission not granted, cannot show notification");
-        console.warn("   Current permission:", Notification.permission);
-      }
+      // Show custom WhatsApp-style popup notification
+      showNotification({
+        notification: payload.notification,
+        data: payload.data,
+      });
+      
+      console.log("✅ Custom popup notification triggered");
     });
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [showNotification]);
 
 
   // LOAD PROJECTS (realtime)
@@ -220,6 +212,7 @@ export default function Dashboard() {
           });
           
           const count = unseenNotifications.length;
+          console.log(`📊 Project ${project.name}: ${count} unseen notifications`);
           setProjectNotificationCounts((prev) => ({
             ...prev,
             [project.id]: count,

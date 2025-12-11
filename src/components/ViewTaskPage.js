@@ -227,34 +227,64 @@ const addTask = async () => {
           // Get FCM tokens for all assigned users (except creator)
           const usersSnapshot = await getDocs(collection(db, "users"));
           const targetTokens = [];
+          const usersWithoutTokens = [];
+          const usersWithTokens = [];
           
           usersSnapshot.forEach((userDoc) => {
             const userData = userDoc.data();
             const userDocUID = userDoc.id;
             
-            // Include user if: assigned to project, has FCM token, and not the creator
-            if (
-              assignedUsers.includes(userDocUID) &&
-              userData.fcmToken &&
-              userDocUID !== userUID
-            ) {
-              targetTokens.push(userData.fcmToken);
+            // Check if user is assigned to project and not the creator
+            if (assignedUsers.includes(userDocUID) && userDocUID !== userUID) {
+              if (userData.fcmToken) {
+                targetTokens.push(userData.fcmToken);
+                usersWithTokens.push({
+                  uid: userDocUID,
+                  email: userData.email || userDocUID,
+                });
+              } else {
+                usersWithoutTokens.push({
+                  uid: userDocUID,
+                  email: userData.email || userDocUID,
+                });
+              }
             }
           });
           
+          // Log detailed information for debugging
+          console.log("📊 FCM Token Status for Assigned Users:");
+          console.log(`   Total assigned users (excluding creator): ${assignedUsers.filter(uid => uid !== userUID).length}`);
+          console.log(`   Users with FCM tokens: ${usersWithTokens.length}`);
+          if (usersWithTokens.length > 0) {
+            console.log("   ✅ Users with tokens:", usersWithTokens.map(u => u.email || u.uid));
+          }
+          console.log(`   Users without FCM tokens: ${usersWithoutTokens.length}`);
+          if (usersWithoutTokens.length > 0) {
+            console.log("   ❌ Users without tokens:", usersWithoutTokens.map(u => u.email || u.uid));
+            console.log("   💡 To fix: These users need to:");
+            console.log("      1. Login to the app");
+            console.log("      2. Allow notification permission");
+            console.log("      3. Run 'registerFCMToken()' in browser console");
+            console.log("      4. Or wait for auto-initialization on login");
+          }
+          
           // Send notifications if there are target users
           if (targetTokens.length > 0) {
-            // Backend API URL - Update this to your deployed backend URL
+            // Backend API URL
             // For local development: http://localhost:3001
-            // For production: https://your-backend.onrender.com
+            // For production: Set REACT_APP_NOTIFICATION_API_URL in Vercel environment variables
+            // Or use your deployed backend URL (e.g., Render.com, Railway, etc.)
             const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
-                          "http://localhost:3001";
+                          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+                            ? "http://localhost:3001"
+                            : "https://your-backend-url.onrender.com"); // Update this to your production backend URL
             
             console.log(`📤 Sending notifications to ${targetTokens.length} users`);
             console.log(`🔗 Backend API URL: ${API_URL}`);
             console.log(`📋 Target tokens:`, targetTokens.map(t => t.substring(0, 20) + "..."));
             
-            // Prepare notification data
+            // Prepare notification data with absolute URL
+            const baseUrl = window.location.origin;
             const notificationData = {
               projectId: projectId,
               projectName: projectName || "Project",
@@ -264,6 +294,7 @@ const addTask = async () => {
               createdByUID: userUID,
               createdByName: userName,
               link: `/view/${projectId}/${encodeURIComponent(projectName || "Project")}`,
+              origin: baseUrl, // Add origin for backend to construct absolute URL
             };
             
             // Call backend API to send batch notifications
@@ -307,10 +338,22 @@ const addTask = async () => {
             console.warn(`   - Assigned users: ${assignedUsers.length}`);
             console.warn(`   - Users with FCM tokens: ${targetTokens.length}`);
             console.warn(`   - Creator UID: ${userUID}`);
-            console.warn("   Possible reasons:");
-            console.warn("   1. Users haven't granted notification permission");
-            console.warn("   2. FCM tokens not saved in Firestore");
-            console.warn("   3. All assigned users are the creator");
+            if (usersWithoutTokens.length > 0) {
+              console.warn("   ❌ Users missing FCM tokens:");
+              usersWithoutTokens.forEach(user => {
+                console.warn(`      - ${user.email || user.uid}`);
+              });
+            }
+            console.warn("   💡 Solution:");
+            console.warn("   1. Ask these users to login to the app");
+            console.warn("   2. They should allow notification permission when prompted");
+            console.warn("   3. If permission was denied, they need to:");
+            console.warn("      - Click 🔒 icon in browser address bar");
+            console.warn("      - Go to Site settings → Notifications → Allow");
+            console.warn("      - Refresh page and login again");
+            console.warn("   4. Or they can manually register by running in browser console:");
+            console.warn("      registerFCMToken()");
+            console.warn("   5. Verify token is saved in Firestore: users/{userUID}/fcmToken");
           }
         }
       } catch (fcmError) {
