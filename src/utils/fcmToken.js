@@ -75,21 +75,52 @@ export const getFCMToken = async () => {
       return null;
     }
 
+    // Ensure service worker is ready before getting token
+    if (!navigator.serviceWorker.controller) {
+      console.warn("⚠️ Service worker controller not available");
+      console.warn("   Waiting for service worker...");
+      const registration = await navigator.serviceWorker.ready;
+      if (!registration || !registration.active) {
+        console.error("❌ Service worker not active");
+        return null;
+      }
+    }
+
     // Get FCM token
+    console.log("   Calling getToken() with VAPID key...");
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
     });
 
     if (token) {
-      console.log("✅ FCM Token obtained:", token.substring(0, 20) + "...");
+      console.log("✅ FCM Token obtained:", token.substring(0, 30) + "...");
+      console.log("   Token length:", token.length);
       return token;
     } else {
       console.warn("⚠️ No FCM token available");
+      console.warn("   getToken() returned null");
+      console.warn("   This usually means:");
+      console.warn("   1. Service worker not ready");
+      console.warn("   2. VAPID key mismatch");
+      console.warn("   3. Notification permission not granted");
       return null;
     }
   } catch (error) {
     console.error("❌ Error getting FCM token:", error);
     console.error("   Error details:", error.message);
+    console.error("   Error code:", error.code || "unknown");
+    
+    // Provide specific error messages
+    if (error.code === "messaging/registration-token-not-available") {
+      console.error("   Service worker not registered or not ready");
+    } else if (error.code === "messaging/invalid-vapid-key") {
+      console.error("   VAPID key is invalid");
+      console.error("   Check REACT_APP_VAPID_KEY in .env file");
+    } else if (error.message?.includes("vapid")) {
+      console.error("   VAPID key issue");
+      console.error("   Verify VAPID key from Firebase Console");
+    }
+    
     return null;
   }
 };
@@ -254,66 +285,107 @@ const waitForServiceWorker = async () => {
 export const initializeFCMToken = async (userUID) => {
   if (!userUID) {
     console.warn("⚠️ User UID not provided for FCM token initialization");
-    return;
+    return false;
   }
 
   try {
     console.log("🔄 Initializing FCM token for user:", userUID);
     console.log("   Checking prerequisites...");
     
-    // Check if messaging is available
+    // Step 1: Check if messaging is available
     if (!messaging) {
       console.error("❌ Firebase Messaging not initialized");
-      console.error("   Make sure firebase-messaging-sw.js is in public folder");
-      return;
+      console.error("   Possible reasons:");
+      console.error("   1. Browser doesn't support service workers");
+      console.error("   2. firebase-messaging-sw.js not in public folder");
+      console.error("   3. Firebase config issue");
+      return false;
     }
+    console.log("   ✅ Firebase Messaging initialized");
 
-    // Wait for service worker to be ready
-    console.log("   Waiting for service worker...");
-    const swReady = await waitForServiceWorker();
-    if (!swReady) {
-      console.warn("⚠️ Service worker not ready, but continuing...");
-    }
-
-    // Check VAPID key
+    // Step 2: Check VAPID key FIRST (before waiting for service worker)
     if (!VAPID_KEY) {
       console.error("❌ VAPID_KEY is not set!");
-      console.error("   Set REACT_APP_VAPID_KEY in .env file");
-      console.error("   Get it from: Firebase Console > Project Settings > Cloud Messaging > Web Push certificates");
-      console.error("   Then restart the development server");
-      return;
+      console.error("   This is REQUIRED for FCM token generation");
+      console.error("   Steps to fix:");
+      console.error("   1. Go to Firebase Console: https://console.firebase.google.com");
+      console.error("   2. Select project: to-do-app-dcdb3");
+      console.error("   3. Project Settings → Cloud Messaging tab");
+      console.error("   4. Web Push certificates section");
+      console.error("   5. Generate new key pair (if not exists)");
+      console.error("   6. Copy the 'Key pair' value");
+      console.error("   7. Create .env file in todos folder:");
+      console.error("      REACT_APP_VAPID_KEY=your-vapid-key-here");
+      console.error("   8. Restart development server (npm start)");
+      console.error("   9. For production: Set REACT_APP_VAPID_KEY in Vercel environment variables");
+      return false;
     }
     console.log("   ✅ VAPID_KEY is set");
 
-    console.log("   Step 1: Getting FCM token...");
-    
-    // Get FCM token
+    // Step 3: Wait for service worker to be ready (CRITICAL)
+    console.log("   Step 3: Waiting for service worker...");
+    const swReady = await waitForServiceWorker();
+    if (!swReady) {
+      console.error("❌ Service worker not ready after waiting");
+      console.error("   This is REQUIRED for FCM token generation");
+      console.error("   Possible reasons:");
+      console.error("   1. Service worker file not accessible at /firebase-messaging-sw.js");
+      console.error("   2. Browser blocking service worker");
+      console.error("   3. HTTPS required (or localhost)");
+      console.error("   💡 Solution:");
+      console.error("   - Check if firebase-messaging-sw.js exists in public folder");
+      console.error("   - Check browser console for service worker errors");
+      console.error("   - Try refreshing the page");
+      console.error("   - Check if running on HTTPS or localhost");
+      return false;
+    }
+    console.log("   ✅ Service worker is ready");
+
+    // Step 4: Request notification permission
+    console.log("   Step 4: Checking notification permission...");
+    if (Notification.permission === "denied") {
+      console.error("❌ Notification permission is DENIED");
+      console.error("   User has blocked notifications");
+      console.error("   💡 Solution:");
+      console.error("   1. Browser address bar → 🔒 icon → Site settings");
+      console.error("   2. Notifications → Allow");
+      console.error("   3. Refresh page (F5)");
+      return false;
+    }
+
+    // Step 5: Get FCM token
+    console.log("   Step 5: Getting FCM token...");
     const token = await getFCMToken();
     
-    if (token) {
-      console.log("   Step 2: Saving FCM token to Firestore...");
-      // Save token to Firestore
+    if (!token) {
+      console.error("❌ Could not obtain FCM token");
+      console.error("   Check the errors above for details");
+      return false;
+    }
+    
+    console.log("   ✅ FCM Token obtained:", token.substring(0, 30) + "...");
+
+    // Step 6: Save token to Firestore
+    console.log("   Step 6: Saving FCM token to Firestore...");
+    try {
       await saveFCMTokenToFirestore(userUID, token);
       console.log("✅ FCM token initialization complete");
       console.log("   ✅ Token obtained and saved successfully");
+      console.log("   ✅ User will now receive push notifications");
       return true;
-    } else {
-      console.warn("⚠️ Could not obtain FCM token");
-      console.warn("   Possible reasons:");
-      console.warn("   1. Notification permission is not granted");
-      console.warn("   2. Service worker is not registered");
-      console.warn("   3. Browser doesn't support FCM");
-      console.warn("   💡 Solution:");
-      console.warn("   - Allow notifications in browser settings");
-      console.warn("   - Check service worker registration in DevTools");
-      console.warn("   - Try running registerFCMToken() manually in console");
+    } catch (saveError) {
+      console.error("❌ Error saving token to Firestore:", saveError);
+      console.error("   Token was obtained but not saved");
+      console.error("   Check Firestore rules and permissions");
       return false;
     }
   } catch (error) {
     console.error("❌ Error initializing FCM token:", error);
     console.error("   Error details:", error.message);
     console.error("   Error code:", error.code);
-    console.error("   Stack:", error.stack);
+    if (error.stack) {
+      console.error("   Stack:", error.stack);
+    }
     return false;
   }
 };
