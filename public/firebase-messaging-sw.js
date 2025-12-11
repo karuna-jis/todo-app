@@ -13,14 +13,26 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+try {
+  firebase.initializeApp(firebaseConfig);
+  console.log("[SW] ✅ Firebase initialized successfully");
+} catch (error) {
+  console.error("[SW] ❌ Firebase initialization error:", error);
+}
+
+// Initialize Firebase Messaging
+let messaging = null;
+try {
+  messaging = firebase.messaging();
+  console.log("[SW] ✅ Firebase Messaging initialized successfully");
+} catch (error) {
+  console.error("[SW] ❌ Firebase Messaging initialization error:", error);
+}
 
 // Log service worker initialization
 console.log("[SW] ===== SERVICE WORKER INITIALIZED =====");
-console.log("[SW] Firebase initialized");
-console.log("[SW] Messaging initialized");
 console.log("[SW] Service worker scope:", self.registration?.scope || "unknown");
+console.log("[SW] Messaging object:", messaging ? "✅ Available" : "❌ Not available");
 console.log("[SW] Service worker ready to handle background notifications");
 
 // PWA Offline Caching
@@ -123,66 +135,91 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Background notifications - This handles notifications when app is CLOSED
-messaging.onBackgroundMessage((payload) => {
-  console.log("[SW] ===== BACKGROUND MESSAGE RECEIVED (App Closed) =====");
-  console.log("[SW] Full payload:", JSON.stringify(payload, null, 2));
-  console.log("[SW] Notification object:", payload.notification);
-  console.log("[SW] Data object:", payload.data);
-  console.log("[SW] Webpush object:", payload.webpush);
-
-  // Extract notification details - prioritize notification object, fallback to data
-  const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
-  const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+// CRITICAL: This handler MUST be registered for background notifications to work
+if (!messaging) {
+  console.error("[SW] ❌ CRITICAL: Messaging object is null! Background notifications will NOT work!");
+  console.error("[SW] Check Firebase initialization in service worker");
+} else {
+  console.log("[SW] ✅ Registering onBackgroundMessage handler...");
   
-  // Build notification options
-  const notificationOptions = {
-    body: notificationBody,
-    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
-    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
-    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
-    data: {
-      ...payload.data,
-      // Ensure all data fields are preserved
-      projectId: payload.data?.projectId || "",
-      projectName: payload.data?.projectName || "",
-      taskId: payload.data?.taskId || "",
-      taskName: payload.data?.taskName || "",
-      addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
-      addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
-      link: payload.fcmOptions?.link || payload.data?.link || ""
-    },
-    tag: payload.data?.taskId || `task-${Date.now()}`, // Unique tag to prevent duplicates
-    requireInteraction: false,
-    vibrate: [200, 100, 200], // Vibration pattern for mobile
-    silent: false, // CRITICAL: Must be false for sound to play
-    renotify: true,
-    timestamp: Date.now(),
-    // Additional options for better mobile support
-    dir: "ltr",
-    lang: "en"
-  };
+  messaging.onBackgroundMessage((payload) => {
+    console.log("[SW] ===== BACKGROUND MESSAGE RECEIVED (App Closed) =====");
+    console.log("[SW] Full payload:", JSON.stringify(payload, null, 2));
+    console.log("[SW] Notification object:", payload.notification);
+    console.log("[SW] Data object:", payload.data);
+    console.log("[SW] Webpush object:", payload.webpush);
 
-  console.log("[SW] Notification title:", notificationTitle);
-  console.log("[SW] Notification body:", notificationBody);
-  console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+    // Extract notification details - prioritize notification object, fallback to data
+    const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
+    const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+    
+    // Build notification options - Make it popup/alert style
+    const notificationOptions = {
+      body: notificationBody,
+      icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
+      badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+      image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
+      sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
+      data: {
+        ...payload.data,
+        // Ensure all data fields are preserved
+        projectId: payload.data?.projectId || "",
+        projectName: payload.data?.projectName || "",
+        taskId: payload.data?.taskId || "",
+        taskName: payload.data?.taskName || "",
+        addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+        addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
+        link: payload.fcmOptions?.link || payload.data?.link || ""
+      },
+      tag: payload.data?.taskId || `task-${Date.now()}`, // Unique tag to prevent duplicates
+      requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
+      vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern for attention
+      silent: false, // CRITICAL: Must be false for sound to play
+      renotify: true,
+      timestamp: Date.now(),
+      // Additional options for better mobile support and popup visibility
+      dir: "ltr",
+      lang: "en",
+      // Make notification more prominent (popup style)
+      actions: [
+        {
+          action: "view",
+          title: "View Task"
+        },
+        {
+          action: "dismiss",
+          title: "Dismiss"
+        }
+      ]
+    };
 
-  // CRITICAL: Always show notification when app is closed
-  // Use waitUntil to ensure notification is shown even if service worker is busy
-  return self.registration.showNotification(notificationTitle, notificationOptions)
-    .then(() => {
-      console.log("[SW] ✅ Background notification shown successfully!");
-    })
-    .catch((error) => {
-      console.error("[SW] ❌ Error showing background notification:", error);
-      // Try again with minimal options if first attempt fails
-      return self.registration.showNotification(notificationTitle, {
-        body: notificationBody,
-        icon: "/icons/icon.png",
-        badge: "/icons/icon.png",
-        data: payload.data || {}
+    console.log("[SW] Notification title:", notificationTitle);
+    console.log("[SW] Notification body:", notificationBody);
+    console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+
+    // CRITICAL: Always show notification when app is closed
+    // Use waitUntil to ensure notification is shown even if service worker is busy
+    return self.registration.showNotification(notificationTitle, notificationOptions)
+      .then(() => {
+        console.log("[SW] ✅ Background notification shown successfully!");
+      })
+      .catch((error) => {
+        console.error("[SW] ❌ Error showing background notification:", error);
+        // Try again with minimal options if first attempt fails (still popup style)
+        return self.registration.showNotification(notificationTitle, {
+          body: notificationBody,
+          icon: "/icons/icon.png",
+          badge: "/icons/icon.png",
+          requireInteraction: true, // Keep as popup even in fallback
+          silent: false,
+          vibrate: [200, 100, 200],
+          data: payload.data || {}
+        });
       });
-    });
-});
+  });
+  
+  console.log("[SW] ✅ onBackgroundMessage handler registered successfully");
+}
 
 // Fallback: Push event listener (for browsers that don't use FCM directly)
 self.addEventListener("push", (event) => {
@@ -209,8 +246,9 @@ self.addEventListener("push", (event) => {
     body: notificationBody,
     icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
     badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+    image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
     sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
-    vibrate: [200, 100, 200],
+    vibrate: [200, 100, 200, 100, 200], // Longer vibration for attention
     silent: false, // CRITICAL: Must be false for sound
     data: {
       ...payload.data,
@@ -221,9 +259,20 @@ self.addEventListener("push", (event) => {
       link: payload.fcmOptions?.link || payload.data?.link || ""
     },
     tag: payload.data?.taskId || `task-${Date.now()}`,
-    requireInteraction: false,
+    requireInteraction: true, // CRITICAL: Keep notification visible (popup style)
     renotify: true,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    // Popup-style actions
+    actions: [
+      {
+        action: "view",
+        title: "View Task"
+      },
+      {
+        action: "dismiss",
+        title: "Dismiss"
+      }
+    ]
   };
 
   console.log("[SW] Showing push notification:", notificationTitle);
@@ -240,12 +289,25 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Handle notification click
+// Handle notification click and action buttons
 self.addEventListener("notificationclick", (event) => {
+  console.log("[SW] ===== NOTIFICATION CLICKED =====");
+  console.log("[SW] Action:", event.action);
+  console.log("[SW] Notification data:", event.notification.data);
+  
+  const data = event.notification.data || {};
+  const action = event.action;
+  
+  // Handle action buttons
+  if (action === "dismiss") {
+    console.log("[SW] User dismissed notification");
+    event.notification.close();
+    return;
+  }
+  
+  // Default action or "view" action - open the app
   event.notification.close();
 
-  const data = event.notification.data || {};
-  
   // Get URL from fcmOptions.link (absolute URL from backend) or construct from data
   let urlToOpen = data.link || "/dashboard";
   
