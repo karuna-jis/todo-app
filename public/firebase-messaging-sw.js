@@ -1,4 +1,4 @@
-// Service Worker for Firebase Cloud Messaging
+// Service Worker for Firebase Cloud Messaging + Offline Support
 importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js");
 
@@ -14,6 +14,105 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
+
+// PWA Offline Caching
+const CACHE_NAME = 'todo-app-v2';
+const urlsToCache = [
+  '/',
+  '/dashboard',
+  '/manifest.json',
+  '/logo192.png',
+  '/logo512.png',
+  '/icons/icon.png',
+  '/icons/iconn.png',
+  '/static/js/bundle.js',
+  '/static/css/main.css'
+];
+
+// Install event - cache resources
+self.addEventListener('install', (event) => {
+  console.log('[SW] Installing service worker...');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        console.log('[SW] Caching app shell');
+        return cache.addAll(urlsToCache).catch((err) => {
+          console.log('[SW] Cache addAll error (some files may not exist):', err);
+        });
+      })
+      .then(() => self.skipWaiting()) // Activate immediately
+  );
+});
+
+// Activate event - clean up old caches
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating service worker...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // Take control of all pages
+  );
+});
+
+// Fetch event - serve from cache, fallback to network
+self.addEventListener('fetch', (event) => {
+  // Skip Firebase and external API requests
+  if (event.request.url.includes('firebase') || 
+      event.request.url.includes('gstatic') ||
+      event.request.url.includes('googleapis') ||
+      event.request.method !== 'GET') {
+    return;
+  }
+  
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        // Return cached version if available
+        if (response) {
+          return response;
+        }
+        
+        // Try network first, then cache
+        return fetch(event.request).then((response) => {
+          // Don't cache if not a valid response
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          
+          // Clone the response for caching
+          const responseToCache = response.clone();
+          
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          
+          return response;
+        }).catch(() => {
+          // If fetch fails and it's a navigation request, return cached index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('/').then((cachedResponse) => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              // Fallback: return a basic offline page
+              return new Response('Offline - Please check your connection', {
+                headers: { 'Content-Type': 'text/html' }
+              });
+            });
+          }
+          // For other requests, return cached version if available
+          return caches.match(event.request);
+        });
+      })
+  );
+});
 
 // Background notifications
 messaging.onBackgroundMessage((payload) => {

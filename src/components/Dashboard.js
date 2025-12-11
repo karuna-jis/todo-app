@@ -71,6 +71,10 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [projectNotificationCounts, setProjectNotificationCounts] = useState({});
 
+  // PWA INSTALL PROMPT STATE
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+
   // ADMIN TASKS STATE - Real-time task list for admin
   const [adminTasks, setAdminTasks] = useState([]);
 
@@ -84,6 +88,94 @@ export default function Dashboard() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // PWA Install Prompt Handler
+  useEffect(() => {
+    // Listen for beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+      console.log('📱 PWA install prompt available');
+    };
+
+    // Listen for app installed event
+    const handleAppInstalled = () => {
+      console.log('✅ PWA installed successfully');
+      setDeferredPrompt(null);
+      setShowInstallButton(false);
+    };
+
+    // Listen for custom events from index.html
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-installable', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener('pwa-installed', handleAppInstalled);
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      console.log('✅ App is already installed');
+      setShowInstallButton(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-installable', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('pwa-installed', handleAppInstalled);
+    };
+  }, []);
+
+  // Handle install button click
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      // Try to get from window object (fallback)
+      const prompt = window.deferredPrompt;
+      if (!prompt) {
+        console.warn('⚠️ Install prompt not available');
+        return;
+      }
+      
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('✅ User accepted install prompt');
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'App installed successfully!',
+          timer: 3000
+        });
+      } else {
+        console.log('❌ User dismissed install prompt');
+      }
+      
+      window.deferredPrompt = null;
+      setShowInstallButton(false);
+      return;
+    }
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+
+    if (outcome === 'accepted') {
+      console.log('✅ User accepted install prompt');
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'App installed successfully!',
+        timer: 3000
+      });
+    } else {
+      console.log('❌ User dismissed install prompt');
+    }
+
+    setDeferredPrompt(null);
+    setShowInstallButton(false);
+  };
 
   // AUTH LISTENER
   useEffect(() => {
@@ -933,9 +1025,28 @@ export default function Dashboard() {
   return (
     <div className="container-fluid p-0">
       {/* HEADER */}
-      <div className="w-100 text-center py-2 py-md-3" style={{ backgroundColor: "#2a8c7b" }}>
-      <h1 className="text-white fw-bold dashboard-title">Dashboard</h1>
-
+      <div className="w-100 text-center py-2 py-md-3 position-relative" style={{ backgroundColor: "#2a8c7b" }}>
+        <h1 className="text-white fw-bold dashboard-title">Dashboard</h1>
+        
+        {/* PWA Install Button */}
+        {showInstallButton && (
+          <button
+            onClick={handleInstallClick}
+            className="btn btn-light btn-sm position-absolute"
+            style={{
+              top: "50%",
+              right: "15px",
+              transform: "translateY(-50%)",
+              fontSize: "12px",
+              padding: "6px 12px",
+              borderRadius: "20px",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+            }}
+            title="Install App"
+          >
+            📱 Install App
+          </button>
+        )}
       </div>
 
       <div className="row m-0">

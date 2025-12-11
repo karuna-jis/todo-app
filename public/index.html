@@ -2,32 +2,75 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/icon/icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
+    <link rel="icon" href="%PUBLIC_URL%/logo192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2a8c7b" />
+    <meta name="description" content="Manage your tasks and projects efficiently with To-Do App" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Todo App" />
+    
+    <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/logo192.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!-- Register Firebase Messaging Service Worker -->
+    <!-- Register Service Worker for PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          // Register Firebase Messaging Service Worker (includes offline support)
           navigator.serviceWorker.register('/firebase-messaging-sw.js')
             .then((registration) => {
-              console.log('Service Worker registered:', registration);
+              console.log('✅ Service Worker registered:', registration.scope);
+              
+              // Check for updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      console.log('🔄 New service worker available. Refresh to update.');
+                      // Optional: Show update notification to user
+                    } else if (newWorker.state === 'activated') {
+                      console.log('✅ Service worker activated');
+                    }
+                  });
+                }
+              });
             })
             .catch((error) => {
-              console.error('Service Worker registration failed:', error);
+              console.error('❌ Service Worker registration failed:', error);
             });
         });
       }
+      
+      // Handle app installation prompt
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Store the event for later use
+        window.deferredPrompt = deferredPrompt;
+        console.log('📱 App can be installed');
+        // Dispatch custom event for React components to listen
+        window.dispatchEvent(new CustomEvent('pwa-installable', { detail: e }));
+      });
+      
+      window.addEventListener('appinstalled', () => {
+        console.log('✅ App installed successfully');
+        deferredPrompt = null;
+        window.deferredPrompt = null;
+        // Dispatch custom event for React components
+        window.dispatchEvent(new CustomEvent('pwa-installed'));
+      });
     </script>
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
