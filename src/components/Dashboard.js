@@ -197,16 +197,31 @@ export default function Dashboard() {
       (snapshot) => {
         const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         console.log(`✅ Found ${list.length} projects for user ${userUID}`);
-        list.forEach((p) => {
-          console.log(`   - Project: ${p.name} (ID: ${p.id})`);
-          console.log(`     Assigned users: ${(p.users || []).length}`);
-        });
+        
+        // Detailed logging
+        if (list.length === 0) {
+          console.warn("⚠️ No projects found for this user");
+          console.warn("   Make sure user is assigned to at least one project");
+          console.warn("   Check Firestore: projects collection → users array should contain:", userUID);
+        } else {
+          list.forEach((p) => {
+            console.log(`   - Project: ${p.name} (ID: ${p.id})`);
+            console.log(`     Assigned users: ${(p.users || []).length}`);
+            console.log(`     Users array:`, p.users);
+            // Check if current user is in the array
+            const isUserInArray = (p.users || []).includes(userUID);
+            console.log(`     Current user (${userUID}) in array:`, isUserInArray ? "✅ YES" : "❌ NO");
+          });
+        }
+        
         setProjects(list);
       },
       (error) => {
         console.error("❌ Error loading projects:", error);
         console.error("   Error code:", error.code);
         console.error("   Error message:", error.message);
+        console.error("   This might be a Firestore rules issue");
+        console.error("   Check Firebase Console → Firestore → Rules");
       }
     );
 
@@ -399,20 +414,36 @@ export default function Dashboard() {
         console.warn("⚠️ Some users were not found, using only valid users");
       }
       
+      const finalUsers = validUsers.length > 0 ? validUsers : assignedUsers;
+      
       // Update project with assigned users
-      await updateDoc(doc(db, "projects", selectedProject.id), { 
-        users: validUsers.length > 0 ? validUsers : assignedUsers 
+      const projectRef = doc(db, "projects", selectedProject.id);
+      await updateDoc(projectRef, { 
+        users: finalUsers 
       });
       
-      console.log("✅ Project updated successfully");
-      console.log("   Updated users array:", validUsers.length > 0 ? validUsers : assignedUsers);
+      // Verify the update was successful
+      const updatedDoc = await getDoc(projectRef);
+      if (updatedDoc.exists()) {
+        const updatedData = updatedDoc.data();
+        console.log("✅ Project updated successfully");
+        console.log("   Updated users array:", updatedData.users);
+        console.log("   Total users in project:", updatedData.users?.length || 0);
+        
+        // Log each assigned user's UID for debugging
+        updatedData.users?.forEach((uid, index) => {
+          const user = allUsers.find(u => u.id === uid);
+          console.log(`   User ${index + 1}: ${uid} (${user?.email || 'Unknown'})`);
+        });
+      }
       
       setShowAssignModal(false);
       Swal.fire({ 
         toast: true, 
         position: "top-end", 
         icon: "success", 
-        title: `Users Assigned (${validUsers.length > 0 ? validUsers.length : assignedUsers.length} users)` 
+        title: `Users Assigned (${finalUsers.length} users)`,
+        text: "Assigned users will see the project in their dashboard"
       });
     } catch (err) {
       console.error("❌ Error saving assigned users:", err);
@@ -468,6 +499,56 @@ export default function Dashboard() {
   const handleView = (id, name) => {
     navigate(`/view/${id}/${name}`);
   };
+
+  // Debug function - Check project assignment
+  // Can be called from browser console: window.checkProjectAssignment()
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.checkProjectAssignment = async () => {
+        console.log("🔍 Checking Project Assignment Status...");
+        console.log("   Current User UID:", userUID);
+        console.log("   Current User Email:", userEmail);
+        console.log("   Projects in state:", projects.length);
+        
+        if (!userUID) {
+          console.error("❌ User not logged in");
+          return;
+        }
+
+        try {
+          // Get all projects from Firestore
+          const allProjectsSnapshot = await getDocs(collection(db, "projects"));
+          console.log(`\n📊 All Projects in Firestore: ${allProjectsSnapshot.docs.length}`);
+          
+          allProjectsSnapshot.docs.forEach((docSnap) => {
+            const projectData = docSnap.data();
+            const projectUsers = projectData.users || [];
+            const isUserAssigned = projectUsers.includes(userUID);
+            
+            console.log(`\n   Project: ${projectData.name} (ID: ${docSnap.id})`);
+            console.log(`     Total assigned users: ${projectUsers.length}`);
+            console.log(`     Users array:`, projectUsers);
+            console.log(`     Current user (${userUID}) assigned:`, isUserAssigned ? "✅ YES" : "❌ NO");
+            
+            if (isUserAssigned) {
+              const isInState = projects.find(p => p.id === docSnap.id);
+              console.log(`     In dashboard state:`, isInState ? "✅ YES" : "❌ NO");
+            }
+          });
+          
+          // Check projects in state
+          console.log(`\n📋 Projects in Dashboard State: ${projects.length}`);
+          projects.forEach((p) => {
+            console.log(`   - ${p.name} (ID: ${p.id})`);
+            console.log(`     Users: ${(p.users || []).length}`);
+          });
+          
+        } catch (error) {
+          console.error("❌ Error checking projects:", error);
+        }
+      };
+    }
+  }, [userUID, userEmail, projects]);
 
   // RENDER
   return (
