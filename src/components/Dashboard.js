@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [userEmail, setUserEmail] = useState("");
   const [userUID, setUserUID] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [authChecked, setAuthChecked] = useState(false); // Track if auth check is complete
   const firstLetter = userEmail ? userEmail.charAt(0).toUpperCase() : "";
 
   // PROJECT STATES
@@ -85,6 +86,10 @@ export default function Dashboard() {
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        // Mark auth check as complete
+        if (isMounted) {
+          setAuthChecked(true);
+        }
         // Only navigate if we were previously authenticated (to prevent flicker on initial load)
         if (hasAuthenticated && isMounted) {
           navigate("/");
@@ -99,6 +104,7 @@ export default function Dashboard() {
 
       setUserEmail(user.email || "");
       setUserUID(user.uid || "");
+      setAuthChecked(true); // Mark auth check as complete
       console.log("👤 User authenticated:", {
         email: user.email,
         uid: user.uid
@@ -277,7 +283,10 @@ export default function Dashboard() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [navigate]);
 
   // Handle foreground FCM messages (when app is open)
