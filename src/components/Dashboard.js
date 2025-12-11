@@ -64,6 +64,9 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [projectNotificationCounts, setProjectNotificationCounts] = useState({});
 
+  // ADMIN TASKS STATE - Real-time task list for admin
+  const [adminTasks, setAdminTasks] = useState([]);
+
   // Check if mobile/tablet screen (max-width: 992px)
   useEffect(() => {
     const checkMobile = () => {
@@ -469,6 +472,61 @@ export default function Dashboard() {
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [userUID, projects]);
+
+  // LOAD ALL TASKS FOR ADMIN (realtime) - Show all tasks from all projects
+  useEffect(() => {
+    if (userRole !== "admin" || projects.length === 0) {
+      setAdminTasks([]);
+      return;
+    }
+
+    const unsubscribers = [];
+    const allTasks = [];
+
+    // Listen to tasks from all projects
+    projects.forEach((project) => {
+      const tasksRef = collection(db, "projects", project.id, "tasks");
+      const q = query(tasksRef, orderBy("createdAt", "desc"));
+
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          // Update tasks for this specific project
+          const projectTasks = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            projectId: project.id,
+            projectName: project.name,
+            ...docSnap.data(),
+          }));
+
+          // Merge with tasks from other projects
+          setAdminTasks((prevTasks) => {
+            // Remove old tasks from this project
+            const otherProjectTasks = prevTasks.filter(
+              (t) => t.projectId !== project.id
+            );
+            // Add new tasks from this project
+            const merged = [...otherProjectTasks, ...projectTasks];
+            // Sort by createdAt (newest first)
+            return merged.sort((a, b) => {
+              const aTime = a.createdAt?.toMillis?.() || a.createdAt || 0;
+              const bTime = b.createdAt?.toMillis?.() || b.createdAt || 0;
+              return bTime - aTime;
+            });
+          });
+        },
+        (error) => {
+          console.error(`Error listening to tasks for project ${project.id}:`, error);
+        }
+      );
+
+      unsubscribers.push(unsub);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [userRole, projects]);
 
   // FUNCTIONS
 
