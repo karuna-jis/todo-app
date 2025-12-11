@@ -100,27 +100,49 @@ export default function Dashboard() {
       }
 
       // Initialize FCM token for push notifications
-      // Add delay to ensure service worker is ready
+      // Enhanced initialization with multiple retries for new users
       if (user.uid) {
         console.log("🔄 User logged in, initializing FCM token...");
-        // Wait a bit for service worker to be ready
-        setTimeout(async () => {
-          try {
-            await initializeFCMToken(user.uid);
-          } catch (error) {
-            console.error("❌ Failed to initialize FCM token on login:", error);
-            // Retry after 2 seconds
-            setTimeout(async () => {
-              console.log("🔄 Retrying FCM token initialization...");
-              try {
-                await initializeFCMToken(user.uid);
-              } catch (retryError) {
-                console.error("❌ FCM token initialization failed after retry:", retryError);
-                console.warn("💡 User can manually register token by running: registerFCMToken()");
+        console.log("   User UID:", user.uid);
+        console.log("   User Email:", user.email);
+        
+        // Initialize FCM token with retry mechanism
+        const initializeWithRetry = async (retries = 3, delay = 2000) => {
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              console.log(`   Attempt ${attempt}/${retries}...`);
+              await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Progressive delay
+              const success = await initializeFCMToken(user.uid);
+              if (success) {
+                console.log("✅ FCM token initialized successfully");
+                return;
+              } else {
+                console.warn(`⚠️ Attempt ${attempt} failed, will retry...`);
               }
-            }, 2000);
+            } catch (error) {
+              console.error(`❌ Attempt ${attempt} error:`, error.message);
+              if (attempt === retries) {
+                console.error("❌ FCM token initialization failed after all retries");
+                console.warn("💡 User can manually register token by running: registerFCMToken()");
+                // Show user-friendly message
+                Swal.fire({
+                  toast: true,
+                  position: "top-end",
+                  icon: "info",
+                  title: "Enable notifications for push alerts",
+                  text: "Click the lock icon in address bar → Allow notifications",
+                  timer: 5000,
+                  showConfirmButton: false
+                });
+              }
+            }
           }
-        }, 1000); // Wait 1 second for service worker
+        };
+        
+        // Start initialization after a short delay to ensure page is fully loaded
+        setTimeout(() => {
+          initializeWithRetry();
+        }, 1500); // Initial delay for service worker registration
       }
     });
 

@@ -274,7 +274,7 @@ const addTask = async () => {
             const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
                           (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
                             ? "http://localhost:3001"
-                            : "https://your-backend-url.onrender.com"); // Update this to your production backend URL
+                            : "https://todo-server-xvr8.onrender.com"); // Render.com deployed backend
             
             console.log(`📤 Sending notifications to ${targetTokens.length} users`);
             console.log(`🔗 Backend API URL: ${API_URL}`);

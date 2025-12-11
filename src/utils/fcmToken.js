@@ -16,22 +16,36 @@ const VAPID_KEY = process.env.REACT_APP_VAPID_KEY;
  */
 export const requestNotificationPermission = async () => {
   if (!("Notification" in window)) {
-    console.warn("This browser does not support notifications");
+    console.warn("⚠️ This browser does not support notifications");
     return false;
   }
 
   if (Notification.permission === "granted") {
+    console.log("✅ Notification permission already granted");
     return true;
   }
 
   if (Notification.permission === "denied") {
-    console.warn("Notification permission denied");
+    console.warn("⚠️ Notification permission denied");
+    console.warn("   User needs to enable notifications in browser settings");
     return false;
   }
 
-  // Request permission
-  const permission = await Notification.requestPermission();
-  return permission === "granted";
+  // Request permission (default state)
+  console.log("📢 Requesting notification permission...");
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      console.log("✅ Notification permission granted");
+      return true;
+    } else {
+      console.warn("⚠️ Notification permission not granted:", permission);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ Error requesting notification permission:", error);
+    return false;
+  }
 };
 
 /**
@@ -140,6 +154,7 @@ export const saveFCMTokenToFirestore = async (userUID, token) => {
 
 /**
  * Wait for service worker to be ready
+ * Enhanced version with better error handling and registration check
  * @returns {Promise<boolean>} true if service worker is ready
  */
 const waitForServiceWorker = async () => {
@@ -149,38 +164,86 @@ const waitForServiceWorker = async () => {
   }
 
   try {
-    // Check if service worker is already registered
-    const registration = await navigator.serviceWorker.ready;
-    if (registration) {
-      console.log("✅ Service worker is ready");
+    // First, check if service worker is already registered
+    if (navigator.serviceWorker.controller) {
+      console.log("✅ Service worker is already active");
       return true;
     }
-  } catch (error) {
-    console.warn("⚠️ Service worker not ready yet:", error.message);
-  }
 
-  // Wait for service worker registration
-  return new Promise((resolve) => {
-    let attempts = 0;
-    const maxAttempts = 10;
-    const checkInterval = setInterval(async () => {
-      attempts++;
+    // Check if service worker is ready
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      if (registration && registration.active) {
+        console.log("✅ Service worker is ready");
+        return true;
+      }
+    } catch (error) {
+      console.log("   Service worker not ready yet, waiting...");
+    }
+
+    // Register service worker if not registered
+    if (!navigator.serviceWorker.controller) {
       try {
-        const registration = await navigator.serviceWorker.ready;
-        if (registration) {
-          clearInterval(checkInterval);
-          console.log("✅ Service worker is ready (after wait)");
-          resolve(true);
+        console.log("   Registering service worker...");
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log("   Service worker registered, waiting for activation...");
+        
+        // Wait for activation
+        if (registration.installing) {
+          await new Promise((resolve) => {
+            registration.installing.addEventListener('statechange', function() {
+              if (this.state === 'activated') {
+                resolve();
+              }
+            });
+          });
+        } else if (registration.waiting) {
+          // If waiting, try to activate it
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
       } catch (error) {
+        console.warn("   Could not register service worker:", error.message);
+      }
+    }
+
+    // Wait for service worker to be ready with timeout
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 15; // Increased attempts
+      const checkInterval = setInterval(async () => {
+        attempts++;
+        try {
+          if (navigator.serviceWorker.controller) {
+            clearInterval(checkInterval);
+            console.log("✅ Service worker is ready (after wait)");
+            resolve(true);
+            return;
+          }
+          
+          const registration = await navigator.serviceWorker.ready;
+          if (registration && registration.active) {
+            clearInterval(checkInterval);
+            console.log("✅ Service worker is ready (after wait)");
+            resolve(true);
+            return;
+          }
+        } catch (error) {
+          // Continue checking
+        }
+        
         if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
           console.warn("⚠️ Service worker not ready after waiting");
+          console.warn("   This might be a new user's first visit");
+          console.warn("   Service worker will be ready on next page load");
           resolve(false);
         }
-      }
-    }, 500);
-  });
+      }, 500);
+    });
+  } catch (error) {
+    console.error("❌ Error waiting for service worker:", error);
+    return false;
+  }
 };
 
 /**
