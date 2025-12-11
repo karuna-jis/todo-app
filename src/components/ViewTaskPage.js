@@ -210,153 +210,55 @@ const addTask = async () => {
         // Since creator is already in seenBy, they won't see the badge
       });
       
-      // Send push notifications via Node.js backend API
-      // This sends FCM push notifications to all assigned users (except creator)
+      // Send push notification to admin via Node.js backend API
       try {
-        // Get project document to find assigned users
-        const projectDocRef = doc(db, "projects", projectId);
-        const projectDoc = await getDoc(projectDocRef);
+        const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
+                      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+                        ? "http://localhost:3001"
+                        : "https://todo-server-xvr8.onrender.com");
         
-        if (projectDoc.exists()) {
-          const projectData = projectDoc.data();
-          const assignedUsers = projectData.users || [];
-          
-          // Get FCM tokens for all assigned users (except creator)
-          const usersSnapshot = await getDocs(collection(db, "users"));
-          const targetTokens = [];
-          const usersWithoutTokens = [];
-          const usersWithTokens = [];
-          
-          usersSnapshot.forEach((userDoc) => {
-            const userData = userDoc.data();
-            const userDocUID = userDoc.id;
-            
-            // Check if user is assigned to project and not the creator
-            if (assignedUsers.includes(userDocUID) && userDocUID !== userUID) {
-              if (userData.fcmToken) {
-                targetTokens.push(userData.fcmToken);
-                usersWithTokens.push({
-                  uid: userDocUID,
-                  email: userData.email || userDocUID,
-                });
-              } else {
-                usersWithoutTokens.push({
-                  uid: userDocUID,
-                  email: userData.email || userDocUID,
-                });
-              }
+        console.log(`📤 Sending task notification to admin`);
+        console.log(`🔗 Backend API URL: ${API_URL}`);
+        
+        // Call backend API to send notification to admin
+        const response = await fetch(`${API_URL}/send-task-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId: projectId,
+            addedBy: userEmail,
+            taskName: taskText.trim(),
+            taskId: taskDocRef.id,
+            origin: window.location.origin,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Backend API error (${response.status}):`, errorText);
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error?.includes("no FCM token")) {
+              console.warn("⚠️ Admin has no FCM token. Admin needs to login and allow notifications.");
             }
-          });
-          
-          // Log detailed information for debugging
-          console.log("📊 FCM Token Status for Assigned Users:");
-          console.log(`   Total assigned users (excluding creator): ${assignedUsers.filter(uid => uid !== userUID).length}`);
-          console.log(`   Users with FCM tokens: ${usersWithTokens.length}`);
-          if (usersWithTokens.length > 0) {
-            console.log("   ✅ Users with tokens:", usersWithTokens.map(u => u.email || u.uid));
+          } catch (e) {
+            // Not JSON error
           }
-          console.log(`   Users without FCM tokens: ${usersWithoutTokens.length}`);
-          if (usersWithoutTokens.length > 0) {
-            console.log("   ❌ Users without tokens:", usersWithoutTokens.map(u => u.email || u.uid));
-            console.log("   💡 To fix: These users need to:");
-            console.log("      1. Login to the app");
-            console.log("      2. Allow notification permission");
-            console.log("      3. Run 'registerFCMToken()' in browser console");
-            console.log("      4. Or wait for auto-initialization on login");
-          }
-          
-          // Send notifications if there are target users
-          if (targetTokens.length > 0) {
-            // Backend API URL
-            // For local development: http://localhost:3001
-            // For production: Set REACT_APP_NOTIFICATION_API_URL in Vercel environment variables
-            // Or use your deployed backend URL (e.g., Render.com, Railway, etc.)
-            const API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 
-                          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-                            ? "http://localhost:3001"
-                            : "https://todo-server-xvr8.onrender.com"); // Render.com deployed backend
-            
-            console.log(`📤 Sending notifications to ${targetTokens.length} users`);
-            console.log(`🔗 Backend API URL: ${API_URL}`);
-            console.log(`📋 Target tokens:`, targetTokens.map(t => t.substring(0, 20) + "..."));
-            
-            // Prepare notification data with absolute URL
-            const baseUrl = window.location.origin;
-            const notificationData = {
-              projectId: projectId,
-              projectName: projectName || "Project",
-              taskId: taskDocRef.id,
-              taskName: taskText.trim(),
-              createdBy: userEmail,
-              createdByUID: userUID,
-              createdByName: userName,
-              link: `/view/${projectId}/${encodeURIComponent(projectName || "Project")}`,
-              origin: baseUrl, // Add origin for backend to construct absolute URL
-            };
-            
-            // Call backend API to send batch notifications
-            try {
-              const response = await fetch(`${API_URL}/notify-batch`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  tokens: targetTokens,
-                  title: "New Task Created",
-                  body: `${userName} created: ${taskText.trim()}`,
-                  data: notificationData,
-                }),
-              });
-              
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`❌ Backend API error (${response.status}):`, errorText);
-                throw new Error(`Backend API returned ${response.status}: ${errorText}`);
-              }
-              
-              const result = await response.json();
-              
-              if (result.success) {
-                console.log(`✅ Push notifications sent: ${result.notified} success, ${result.failed} failed`);
-                if (result.failed > 0) {
-                  console.warn(`⚠️ Some notifications failed. Check backend logs.`);
-                }
-              } else {
-                console.error("❌ Failed to send push notifications:", result.error);
-              }
-            } catch (fetchError) {
-              console.error("❌ Error calling backend API:", fetchError);
-              console.error("   Make sure backend server is running at:", API_URL);
-              console.error("   Check if CORS is configured correctly");
-            }
+        } else {
+          const result = await response.json();
+          if (result.success) {
+            console.log(`✅ Push notification sent to admin: ${result.adminEmail}`);
+            console.log(`   Message ID: ${result.messageId}`);
           } else {
-            console.warn("⚠️ No users to notify:");
-            console.warn(`   - Assigned users: ${assignedUsers.length}`);
-            console.warn(`   - Users with FCM tokens: ${targetTokens.length}`);
-            console.warn(`   - Creator UID: ${userUID}`);
-            if (usersWithoutTokens.length > 0) {
-              console.warn("   ❌ Users missing FCM tokens:");
-              usersWithoutTokens.forEach(user => {
-                console.warn(`      - ${user.email || user.uid}`);
-              });
-            }
-            console.warn("   💡 Solution:");
-            console.warn("   1. Ask these users to login to the app");
-            console.warn("   2. They should allow notification permission when prompted");
-            console.warn("   3. If permission was denied, they need to:");
-            console.warn("      - Click 🔒 icon in browser address bar");
-            console.warn("      - Go to Site settings → Notifications → Allow");
-            console.warn("      - Refresh page and login again");
-            console.warn("   4. Or they can manually register by running in browser console:");
-            console.warn("      registerFCMToken()");
-            console.warn("   5. Verify token is saved in Firestore: users/{userUID}/fcmToken");
+            console.error("❌ Failed to send push notification:", result.error);
           }
         }
-      } catch (fcmError) {
-        console.error("❌ Error sending push notification:", fcmError);
-        console.error("   Error details:", fcmError.message);
-        console.error("   Stack:", fcmError.stack);
+      } catch (fetchError) {
+        console.error("❌ Error calling backend API:", fetchError);
+        console.error("   Make sure backend server is running at:", API_URL);
+        console.error("   Check if CORS is configured correctly");
         // Don't block task creation if FCM fails
       }
     } catch (error) {

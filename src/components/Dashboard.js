@@ -63,6 +63,9 @@ export default function Dashboard() {
   // NOTIFICATIONS STATE
   const [notifications, setNotifications] = useState([]);
   const [projectNotificationCounts, setProjectNotificationCounts] = useState({});
+  
+  // ADMIN TASK LIST STATE (Real-time task list for admin)
+  const [adminTasks, setAdminTasks] = useState([]); // { projectId, projectName, taskId, taskName, addedBy, timestamp }
 
   // Check if mobile/tablet screen (max-width: 992px)
   useEffect(() => {
@@ -365,6 +368,57 @@ export default function Dashboard() {
 
     return () => unsub();
   }, [userUID, userEmail]);
+
+  // LOAD REAL-TIME TASKS FOR ADMIN (shows all tasks from all projects)
+  useEffect(() => {
+    if (!userUID || userRole !== "admin" || projects.length === 0) {
+      setAdminTasks([]);
+      return;
+    }
+
+    console.log("📋 Loading real-time tasks for admin...");
+    const unsubscribers = [];
+
+    // Listen to tasks from all projects
+    projects.forEach((project) => {
+      const tasksRef = collection(db, "projects", project.id, "tasks");
+      const q = query(tasksRef, orderBy("createdAt", "desc"));
+
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const projectTasks = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            projectId: project.id,
+            projectName: project.name,
+            ...docSnap.data(),
+          }));
+
+          // Update admin tasks list
+          setAdminTasks((prev) => {
+            // Remove old tasks from this project
+            const filtered = prev.filter((t) => t.projectId !== project.id);
+            // Add new tasks from this project
+            return [...filtered, ...projectTasks].sort((a, b) => {
+              // Sort by timestamp (newest first)
+              const aTime = a.createdAt?.toMillis?.() || 0;
+              const bTime = b.createdAt?.toMillis?.() || 0;
+              return bTime - aTime;
+            });
+          });
+        },
+        (error) => {
+          console.error(`Error loading tasks for project ${project.id}:`, error);
+        }
+      );
+
+      unsubscribers.push(unsub);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [userUID, userRole, projects]);
 
   // LOAD ALL USERS (for assign & list)
   useEffect(() => {
@@ -1015,6 +1069,95 @@ export default function Dashboard() {
 
                 {projects.length === 0 && <div className="text-center text-muted mt-4">No projects created yet.</div>}
               </div>
+
+              {/* ADMIN TASK LIST - Real-time task list for admin */}
+              {userRole === "admin" && (
+                <div className="mt-4 p-3 shadow-sm bg-white" style={{ borderRadius: "12px" }}>
+                  <h5 className="mb-3" style={{ color: "#2a8c7b", fontWeight: "600" }}>
+                    <i className="bi bi-list-task me-2"></i>Recent Tasks (Real-time)
+                  </h5>
+                  {adminTasks.length === 0 ? (
+                    <div className="text-center text-muted py-4">
+                      <i className="bi bi-inbox" style={{ fontSize: "48px", opacity: 0.3 }}></i>
+                      <p className="mt-2">No tasks yet. Tasks will appear here in real-time.</p>
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                      {adminTasks.slice(0, 20).map((task) => {
+                        const timestamp = task.createdAt?.toDate?.() || new Date();
+                        const formattedTime = timestamp.toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        
+                        return (
+                          <div
+                            key={`${task.projectId}-${task.id}`}
+                            className="mb-3 p-3 border rounded"
+                            style={{
+                              backgroundColor: "#f8f9fa",
+                              borderLeft: "4px solid #2a8c7b",
+                              cursor: "pointer",
+                              transition: "all 0.2s",
+                            }}
+                            onClick={() => handleView(task.projectId, task.projectName)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = "#e9ecef";
+                              e.currentTarget.style.transform = "translateX(4px)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = "#f8f9fa";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                          >
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <div>
+                                <strong style={{ color: "#2a8c7b" }}>{task.projectName}</strong>
+                                <span className="text-muted ms-2" style={{ fontSize: "12px" }}>
+                                  <i className="bi bi-clock me-1"></i>{formattedTime}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mb-2">
+                              <span className="badge bg-secondary me-2" style={{ fontSize: "11px" }}>
+                                <i className="bi bi-person-fill me-1"></i>
+                                {task.createdBy || task.addedBy || "Unknown"}
+                              </span>
+                              {task.status && (
+                                <span
+                                  className="badge"
+                                  style={{
+                                    backgroundColor:
+                                      task.status === "Completed"
+                                        ? "#28a745"
+                                        : task.status === "In Progress"
+                                        ? "#ffc107"
+                                        : "#6c757d",
+                                    color: "white",
+                                    fontSize: "11px",
+                                  }}
+                                >
+                                  {task.status}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ color: "#333", fontSize: "14px" }}>
+                              <strong>Task:</strong> {task.text || task.taskName || "N/A"}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {adminTasks.length > 20 && (
+                        <div className="text-center text-muted mt-2" style={{ fontSize: "12px" }}>
+                          Showing latest 20 tasks. Total: {adminTasks.length}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
