@@ -80,11 +80,22 @@ export default function Dashboard() {
 
   // AUTH LISTENER
   useEffect(() => {
+    let isMounted = true;
+    let hasAuthenticated = false;
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        navigate("/");
+        // Only navigate if we were previously authenticated (to prevent flicker on initial load)
+        if (hasAuthenticated && isMounted) {
+          navigate("/");
+        }
         return;
       }
+
+      // Mark that we've authenticated at least once
+      hasAuthenticated = true;
+      
+      if (!isMounted) return;
 
       setUserEmail(user.email || "");
       setUserUID(user.uid || "");
