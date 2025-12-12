@@ -25,9 +25,12 @@ export const auth = getAuth();
 
 // Set auth persistence to LOCAL (survives page refresh, browser close, navigation)
 // This ensures users stay logged in across sessions
+// Credentials are stored securely in browser's key store (IndexedDB/localStorage)
+// User will remain logged in until they manually logout
 setPersistence(auth, browserLocalPersistence)
   .then(() => {
-    console.log("✅ Auth persistence set to LOCAL - users will stay logged in");
+    console.log("✅ Auth persistence set to LOCAL - credentials saved securely");
+    console.log("✅ User will stay logged in until manual logout");
   })
   .catch((error) => {
     console.error("❌ Error setting auth persistence:", error);

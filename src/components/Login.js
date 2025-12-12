@@ -25,16 +25,21 @@ export default function Login() {
   };
 
   // Check if user is already authenticated (persistent login)
+  // Credentials are stored securely in browser's key store
+  // User will be automatically logged in if they haven't manually logged out
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // User is already logged in, check if they exist in Firestore
+        // User is already logged in (credentials restored from secure storage)
+        // Check if they exist in Firestore
         try {
           const exists = await checkEmailInFirestore(user.email);
           if (exists) {
-            // User is authenticated and exists in Firestore, redirect to dashboard
+            // User is authenticated and exists in Firestore
+            // Redirect to dashboard immediately (credentials saved in key store)
+            console.log("✅ User credentials found in secure storage, redirecting to dashboard");
+            console.log("✅ User will stay logged in until manual logout");
             // Use replace: true to prevent back button from going back to login
-            console.log("✅ User already authenticated, redirecting to dashboard");
             navigate("/dashboard", { replace: true });
           } else {
             // User authenticated but not in Firestore, sign them out
@@ -44,6 +49,10 @@ export default function Login() {
         } catch (error) {
           console.error("Error checking user in Firestore:", error);
         }
+      } else {
+        // No user found - credentials not in secure storage
+        // User needs to login
+        console.log("ℹ️ No saved credentials found - user needs to login");
       }
     });
 

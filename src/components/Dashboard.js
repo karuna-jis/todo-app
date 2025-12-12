@@ -484,17 +484,24 @@ export default function Dashboard() {
       }
     });
 
-    // Prevent back button from navigating to login if user is authenticated
+    // Handle back button - prevent login screen, allow app to close
     const handlePopState = (event) => {
-      if (auth.currentUser && location.pathname === "/") {
-        // User is authenticated but back button tried to go to login
-        // Prevent this and redirect to dashboard
-        console.log("🚫 Back button prevented - user is authenticated, redirecting to dashboard");
-        event.preventDefault();
-        navigate("/dashboard", { replace: true });
+      const currentUser = auth.currentUser;
+      
+      if (currentUser) {
+        // User is authenticated
+        if (location.pathname === "/" || location.pathname === "/login") {
+          // Back button tried to go to login - prevent and redirect to dashboard
+          console.log("🚫 Back button prevented - user is authenticated, redirecting to dashboard");
+          event.preventDefault();
+          navigate("/dashboard", { replace: true });
+        }
+        // If on dashboard, allow back button to work normally (may close app)
+        // Don't prevent default - let browser handle it
       }
     };
 
+    // Also handle browser back/forward buttons
     window.addEventListener("popstate", handlePopState);
 
     return () => {
