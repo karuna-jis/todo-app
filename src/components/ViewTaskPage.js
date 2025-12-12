@@ -510,17 +510,18 @@ const addTask = async () => {
         className="w-100 d-flex align-items-center justify-content-between flex-wrap py-2 py-md-3 task-header-responsive"
         style={{ backgroundColor: "#2a8c7b", gap: "10px", position: "sticky", top: 0, zIndex: 100, paddingLeft: "12px", paddingRight: "12px", marginLeft: 0, marginRight: 0 }}
       >
-        <button
-          className="btn btn-light back-btn-responsive"
-          style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0 }}
-          onClick={() => window.history.back()}
-        >
-          ←
-        </button>
-
-        <div className="text-center flex-grow-1" style={{ minWidth: "120px" }}>
-          <h1 className="text-white fw-bold task-title-responsive">Chat Box</h1>
-          <h2 className="text-white task-subtitle-responsive" style={{ fontSize: "14px" }}>
+        <div className="flex-grow-1" style={{ minWidth: "120px", display: "flex", flexDirection: "column" }}>
+          <div className="d-flex align-items-center" style={{ gap: "10px" }}>
+            <button
+              className="btn btn-light back-btn-responsive"
+              style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0 }}
+              onClick={() => window.history.back()}
+            >
+              ←
+            </button>
+            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
+          </div>
+          <h2 className="text-white task-subtitle-responsive" style={{ fontSize: "14px", marginTop: "4px", marginLeft: "45px" }}>
             {projectName}
           </h2>
         </div>
