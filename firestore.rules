@@ -1,0 +1,172 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ---------------- USERS ----------------
+    match /users/{userId} {
+      function isAdmin() {
+        return request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      }
+
+      // ------------- READ -------------
+      // Authenticated users can read all user documents (for user list, etc.)
+      allow read: if request.auth != null;
+
+      // ------------- UPDATE -------------
+      // Users can update their own document with these rules:
+      // 1. Can update FCM token fields (fcmToken, fcmTokenUpdatedAt) - for push notifications
+      // 2. Can update other profile fields, but cannot change role (unless admin) or email
+      allow update: if request.auth != null && request.auth.uid == userId && (
+        // Case 1: Updating only FCM token fields (most common for push notifications)
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["fcmToken", "fcmTokenUpdatedAt"]) ||
+        // Case 2: Updating other fields (profile updates) - protect sensitive fields
+        (
+          // Role can only be changed by admin
+          (!("role" in request.resource.data.diff(resource.data).affectedKeys()) || isAdmin()) &&
+          // Email cannot be changed by anyone
+          (!("email" in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.email == resource.data.email)
+        )
+      );
+
+      // ------------- CREATE -------------
+      // Only admin can create user documents
+      allow create: if isAdmin();
+
+      // ------------- DELETE -------------
+      // Only admin can delete user documents
+      allow delete: if isAdmin();
+    }
+
+    // ---------------- PROJECTS ----------------
+    match /projects/{projectId} {
+      function isAdmin() {
+        return request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      }
+
+      function isUserAssigned() {
+        return request.auth != null &&
+          request.auth.uid in resource.data.users;
+      }
+
+      allow create: if isAdmin();
+      allow read: if isAdmin() || isUserAssigned();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------------- TASKS ----------------
+    match /projects/{projectId}/tasks/{taskId} {
+      function isAdmin() {
+        return request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      }
+
+      function isAssignedUser() {
+        return request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.users;
+      }
+
+      // Check if current user is the task creator (createdBy stores email)
+      function isCreator() {
+        return request.auth != null &&
+          resource.data.createdBy == request.auth.token.email;
+      }
+
+      // ------------- READ -------------
+      // Everyone logged in and assigned to project can read tasks
+      allow read: if isAssignedUser();
+
+      // ------------- CREATE -------------
+      // Everyone logged in and assigned to project can create tasks
+      allow create: if isAssignedUser() &&
+        request.resource.data.createdBy == request.auth.token.email;
+
+      // ------------- UPDATE -------------
+      // Only Admin and Creator can update task status
+      // Assigned users (non-admin, non-creator) CANNOT update status
+      allow update: if
+        (
+          // Creator can update all fields (but createdBy must stay the same)
+          isCreator() &&
+          request.resource.data.createdBy == resource.data.createdBy // createdBy never changes
+        )
+        ||
+        (
+          // Admin can update status, updatedBy, updatedAt
+          isAdmin() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedBy", "updatedAt"]) &&
+          request.resource.data.createdBy == resource.data.createdBy // Ensure createdBy doesn't change
+        );
+
+      // ------------- DELETE -------------
+      // Only creator can delete
+      allow delete: if isCreator();
+    }
+
+    // ---------------- NOTIFICATIONS ----------------
+    match /notifications/{notificationId} {
+      function isAdmin() {
+        return request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      }
+
+      function isAssignedToProject() {
+        return request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.users;
+      }
+
+      // Helper function to check if user can read notification (simpler check)
+      function canReadNotification() {
+        return request.auth != null && (
+          isAdmin() ||
+          isAssignedToProject()
+        );
+      }
+
+      // ------------- READ -------------
+      // Admin can read all notifications
+      // Regular users can read only notifications for their assigned projects
+      allow read: if request.auth != null && (
+        isAdmin() ||
+        isAssignedToProject()
+      );
+
+      // ------------- CREATE -------------
+      // Anyone assigned to the project can create notifications
+      allow create: if request.auth != null &&
+        request.auth.uid in get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.users;
+
+      // ------------- UPDATE -------------
+      // Users can only update seenBy field for notifications in their projects
+      // Admin can update any notification
+      // Allow updating seenBy array (using arrayUnion) for all assigned users
+      // Simplified: If user can read the notification, they can update seenBy
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          // User must be able to read the notification (assigned to project)
+          canReadNotification() &&
+          // Allow updating seenBy field only
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["seenBy"]) &&
+          // Ensure other fields don't change
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.taskId == resource.data.taskId &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.createdByUID == resource.data.createdByUID &&
+          // Ensure seenBy is an array
+          request.resource.data.seenBy is list &&
+          // Ensure seenBy array only grows (arrayUnion behavior - new array size >= old size)
+          request.resource.data.seenBy.size() >= resource.data.seenBy.size()
+        )
+      );
+
+      // ------------- DELETE -------------
+      // Only admin can delete notifications
+      allow delete: if isAdmin();
+    }
+  }
+}
+

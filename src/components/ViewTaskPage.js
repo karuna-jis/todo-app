@@ -41,6 +41,7 @@ export default function ViewTaskPage() {
   const [selectedIndex, setSelectedIndex] = useState(-1); // For keyboard navigation
   const [headerHeight, setHeaderHeight] = useState(0); // Header height for scrollable area
   const [isMobile, setIsMobile] = useState(false); // Check if mobile/tablet screen (max-width: 992px)
+  const [userRole, setUserRole] = useState(""); // User role (admin/user)
 
   // Refs for task cards (for scrolling to selected item)
   const taskRefs = useRef({});
@@ -188,6 +189,33 @@ const tasksColPath = projectId
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // Fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          setUserRole("user");
+          return;
+        }
+
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists()) {
+          setUserRole(userDocSnap.data().role || "user");
+        } else {
+          setUserRole("user");
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setUserRole("user");
+      }
+    };
+
+    fetchUserRole();
+  }, []);
 
   // Helper function to get current user's email
   const getCurrentUserEmail = () => {
@@ -730,6 +758,17 @@ const addTask = async () => {
       const user = auth.currentUser;
       if (!user) {
         alert("You must be logged in to update task status.");
+        e.target.value = t.status; // Reset dropdown
+        return;
+      }
+
+      // Check if user is admin or creator
+      const isCreator = isTaskCreator(t);
+      const isAdmin = userRole === "admin";
+
+      if (!isCreator && !isAdmin) {
+        alert("You are not able to update the task status. Only Admin and Creator can update task status.");
+        e.target.value = t.status; // Reset dropdown to original value
         return;
       }
       
