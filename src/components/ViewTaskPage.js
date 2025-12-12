@@ -559,7 +559,6 @@ const addTask = async () => {
                 ←
               </button>
             )}
-            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
             {isMobile && (
               <button
                 className="btn btn-light back-btn-responsive"
@@ -576,6 +575,7 @@ const addTask = async () => {
                 ←
               </button>
             )}
+            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px" }}>
             {projectName}
