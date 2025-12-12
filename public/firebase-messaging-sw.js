@@ -249,7 +249,7 @@ self.addEventListener("push", (event) => {
     image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
     sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
     vibrate: [200, 100, 200, 100, 200], // Longer vibration for attention
-    silent: true, // CRITICAL: Must be false for sound
+    silent: false, // CRITICAL: Must be false for sound
     data: {
       ...payload.data,
       projectId: payload.data?.projectId || "",
