@@ -706,7 +706,8 @@ const addTask = async () => {
                   flex: "0 0 auto !important",
                   flexShrink: "0 !important",
                   overflow: "visible !important",
-                  position: "relative !important"
+                  position: "relative !important",
+                  marginLeft: "5px !important"
                 },
                 // Extra small mobile devices
                 "@media (max-width: 600px)": {
@@ -714,7 +715,8 @@ const addTask = async () => {
                   visibility: "visible !important",
                   opacity: "1 !important",
                   minWidth: "90px !important",
-                  maxWidth: "130px !important"
+                  maxWidth: "130px !important",
+                  marginLeft: "5px !important"
                 }
               },
               "& .MuiTimelineItem-root": {
@@ -734,13 +736,15 @@ const addTask = async () => {
                     minWidth: "100px !important",
                     flex: "0 0 auto !important",
                     flexShrink: "0 !important",
-                    overflow: "visible !important"
+                    overflow: "visible !important",
+                    marginLeft: "5px !important"
                   },
                   "@media (max-width: 600px)": {
                     display: "flex !important",
                     visibility: "visible !important",
                     opacity: "1 !important",
-                    minWidth: "90px !important"
+                    minWidth: "90px !important",
+                    marginLeft: "5px !important"
                   }
                 }
               }
@@ -791,7 +795,8 @@ const addTask = async () => {
                   flex: "0 0 auto !important",
                   flexShrink: "0 !important",
                   overflow: "visible !important",
-                  position: "relative !important"
+                  position: "relative !important",
+                  marginLeft: "5px !important"
                 },
                 // Extra small mobile devices
                 "@media (max-width: 600px)": {
@@ -799,7 +804,8 @@ const addTask = async () => {
                   visibility: "visible !important",
                   opacity: "1 !important",
                   minWidth: "90px !important",
-                  maxWidth: "130px !important"
+                  maxWidth: "130px !important",
+                  marginLeft: "5px !important"
                 }
               },
               "& .MuiTimelineItem-oppositeContent": {
@@ -817,13 +823,15 @@ const addTask = async () => {
                   minWidth: "100px !important",
                   flex: "0 0 auto !important",
                   flexShrink: "0 !important",
-                  overflow: "visible !important"
+                  overflow: "visible !important",
+                  marginLeft: "5px !important"
                 },
                 "@media (max-width: 600px)": {
                   display: "flex !important",
                   visibility: "visible !important",
                   opacity: "1 !important",
-                  minWidth: "90px !important"
+                  minWidth: "90px !important",
+                  marginLeft: "5px !important"
                 }
               }
               
@@ -863,7 +871,8 @@ const addTask = async () => {
                   flexShrink: "0 !important",
                   overflow: "visible !important",
                   position: "relative !important",
-                  marginRight: "8px !important"
+                  marginRight: "8px !important",
+                  marginLeft: "5px !important"
                 },
                 // Extra small mobile devices
                 "@media (max-width: 600px)": {
@@ -875,9 +884,7 @@ const addTask = async () => {
                   fontSize: "10px !important",
                   paddingRight: "4px !important",
                   paddingLeft: "4px !important",
-
-                  
-                  
+                  marginLeft: "5px !important"
                 }
               }}
               color="text.secondary"
