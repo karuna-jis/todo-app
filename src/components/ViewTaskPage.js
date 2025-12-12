@@ -684,68 +684,40 @@ const addTask = async () => {
             sx={{ 
               paddingLeft: 0, 
               paddingRight: 0,
-              "& .MuiTimelineOppositeContent-root": {
-                display: "flex !important",
-                visibility: "visible !important",
-                opacity: "1 !important",
-                minWidth: { xs: "100px !important", sm: "120px !important" },
-                maxWidth: { xs: "140px !important", sm: "180px !important" },
-                width: "auto !important",
-                flex: "0 0 auto !important",
-                overflow: "visible !important",
-                flexShrink: "0 !important",
-                position: "relative !important",
-                // Mobile specific
-                "@media (max-width: 992px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "100px !important",
-                  maxWidth: "140px !important",
-                  width: "auto !important",
-                  flex: "0 0 auto !important",
-                  flexShrink: "0 !important",
-                  overflow: "visible !important",
-                  position: "relative !important",
-                  marginLeft: "5px !important"
-                },
-                // Extra small mobile devices
-                "@media (max-width: 600px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "90px !important",
-                  maxWidth: "130px !important",
-                  marginLeft: "5px !important"
+              // Mobile: Change layout to vertical
+              "@media (max-width: 767px)": {
+                "& .MuiTimelineItem-root": {
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  "& .MuiTimelineOppositeContent-root": {
+                    width: "100%",
+                    maxWidth: "100%",
+                    minWidth: "100%",
+                    paddingLeft: "48px",
+                    paddingRight: "12px",
+                    paddingBottom: "8px",
+                    textAlign: "left",
+                    order: 1
+                  },
+                  "& .MuiTimelineSeparator-root": {
+                    order: 0,
+                    position: "absolute",
+                    left: 0
+                  },
+                  "& .MuiTimelineContent-root": {
+                    width: "100%",
+                    maxWidth: "100%",
+                    paddingLeft: "48px",
+                    order: 2
+                  }
                 }
               },
-              "& .MuiTimelineItem-root": {
+              // Desktop: Keep horizontal layout
+              "@media (min-width: 768px)": {
                 "& .MuiTimelineOppositeContent-root": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: { xs: "100px !important", sm: "120px !important" },
-                  flex: "0 0 auto !important",
-                  flexShrink: "0 !important",
-                  overflow: "visible !important",
-                  position: "relative !important",
-                  "@media (max-width: 992px)": {
-                    display: "flex !important",
-                    visibility: "visible !important",
-                    opacity: "1 !important",
-                    minWidth: "100px !important",
-                    flex: "0 0 auto !important",
-                    flexShrink: "0 !important",
-                    overflow: "visible !important",
-                    marginLeft: "5px !important"
-                  },
-                  "@media (max-width: 600px)": {
-                    display: "flex !important",
-                    visibility: "visible !important",
-                    opacity: "1 !important",
-                    minWidth: "90px !important",
-                    marginLeft: "5px !important"
-                  }
+                  minWidth: "120px",
+                  maxWidth: "180px",
+                  flexShrink: 0
                 }
               }
             }}
@@ -773,133 +745,95 @@ const addTask = async () => {
             className="task-item-responsive"
             sx={{ 
               width: "100%",
-              "& .MuiTimelineOppositeContent-root": {
-                display: "flex !important",
-                visibility: "visible !important",
-                opacity: "1 !important",
-                minWidth: { xs: "100px !important", sm: "120px !important" },
-                maxWidth: { xs: "140px !important", sm: "180px !important" },
-                width: "auto !important",
-                flex: "0 0 auto !important",
-                overflow: "visible !important",
-                flexShrink: "0 !important",
-                position: "relative !important",
-                // Mobile specific
-                "@media (max-width: 992px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "100px !important",
-                  maxWidth: "140px !important",
-                  width: "auto !important",
-                  flex: "0 0 auto !important",
-                  flexShrink: "0 !important",
-                  overflow: "visible !important",
-                  position: "relative !important",
-                  marginLeft: "5px !important"
-                },
-                // Extra small mobile devices
-                "@media (max-width: 600px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "90px !important",
-                  maxWidth: "130px !important",
-                  marginLeft: "5px !important"
-                }
+              position: "relative",
+              // Mobile: Stack vertically
+              "@media (max-width: 767px)": {
+                flexDirection: "column",
+                alignItems: "stretch"
               },
-              "& .MuiTimelineItem-oppositeContent": {
-                display: "flex !important",
-                visibility: "visible !important",
-                minWidth: { xs: "100px !important", sm: "120px !important" },
-                flex: "0 0 auto !important",
-                flexShrink: "0 !important",
-                overflow: "visible !important",
-                position: "relative !important",
-                "@media (max-width: 992px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "100px !important",
-                  flex: "0 0 auto !important",
-                  flexShrink: "0 !important",
-                  overflow: "visible !important",
-                  marginLeft: "5px !important"
-                },
-                "@media (max-width: 600px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "90px !important",
-                  marginLeft: "5px !important"
-                }
+              // Desktop: Keep horizontal
+              "@media (min-width: 768px)": {
+                flexDirection: "row"
               }
-              
             }}
           >
 
-            {/* LEFT SIDE — ONLY DATE */}
+            {/* DATE - Full width on mobile, left side on desktop */}
             <TimelineOppositeContent
               align="right"
               sx={{ 
                 m: "auto 0", 
                 fontWeight: 600,
-                minWidth: { xs: "100px !important", sm: "120px !important" },
-                maxWidth: { xs: "140px !important", sm: "180px !important" },
-                width: "auto !important",
-                paddingRight: { xs: "8px !important", sm: "16px !important" },
-                paddingLeft: { xs: "8px !important", sm: "12px !important" },
-                display: "flex !important",
-                visibility: "visible !important",
-                opacity: "1 !important",
-                fontSize: { xs: "11px !important", sm: "12px !important" },
-                flex: "0 0 auto !important",
-                flexShrink: "0 !important",
-                overflow: "visible !important",
-                textAlign: "right !important",
-                position: "relative !important",
-                zIndex: 1,
-                // Mobile specific - ensure it's always visible
-                "@media (max-width: 992px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "100px !important",
-                  maxWidth: "140px !important",
-                  width: "auto !important",
-                  flex: "0 0 auto !important",
-                  flexShrink: "0 !important",
-                  overflow: "visible !important",
-                  position: "relative !important",
-                  marginRight: "8px !important",
-                  marginLeft: "5px !important"
+                fontSize: { xs: "11px", sm: "12px" },
+                color: "text.secondary",
+                // Desktop: Left side with fixed width
+                "@media (min-width: 768px)": {
+                  minWidth: "120px",
+                  maxWidth: "180px",
+                  flexShrink: 0,
+                  paddingRight: "16px",
+                  paddingLeft: "12px",
+                  textAlign: "right"
                 },
-                // Extra small mobile devices
-                "@media (max-width: 600px)": {
-                  display: "flex !important",
-                  visibility: "visible !important",
-                  opacity: "1 !important",
-                  minWidth: "90px !important",
-                  maxWidth: "130px !important",
-                  fontSize: "10px !important",
-                  paddingRight: "4px !important",
-                  paddingLeft: "4px !important",
-                  marginLeft: "5px !important"
+                // Mobile: Full width above card
+                "@media (max-width: 767px)": {
+                  width: "100%",
+                  maxWidth: "100%",
+                  minWidth: "100%",
+                  paddingLeft: "48px",
+                  paddingRight: "12px",
+                  paddingBottom: "8px",
+                  paddingTop: "4px",
+                  textAlign: "left",
+                  fontSize: "11px",
+                  order: 1,
+                  flexShrink: 0,
+                  overflow: "visible"
                 }
               }}
-              color="text.secondary"
               className="timeline-date-responsive"
             >
              {formatTs(t.updatedAt)}
             </TimelineOppositeContent>
 
-            <TimelineSeparator>
+            <TimelineSeparator
+              sx={{
+                // Mobile: Position absolutely on left
+                "@media (max-width: 767px)": {
+                  position: "absolute",
+                  left: 0,
+                  order: 0
+                },
+                // Desktop: Normal position
+                "@media (min-width: 768px)": {
+                  position: "relative"
+                }
+              }}
+            >
               <TimelineDot color="success" />
               <TimelineConnector />
             </TimelineSeparator>
 
-            {/* RIGHT SIDE — COMPLETE TASK CARD */}
-            <TimelineContent sx={{ py: "20px", px: 2 }} className="timeline-content-responsive">
+            {/* TASK CARD - Full width on mobile, right side on desktop */}
+            <TimelineContent 
+              sx={{ 
+                py: "20px", 
+                px: 2,
+                // Mobile: Full width below date
+                "@media (max-width: 767px)": {
+                  width: "100%",
+                  maxWidth: "100%",
+                  paddingLeft: "48px",
+                  paddingRight: "12px",
+                  order: 2
+                },
+                // Desktop: Right side
+                "@media (min-width: 768px)": {
+                  flex: 1
+                }
+              }} 
+              className="timeline-content-responsive"
+            >
             <Paper 
               elevation={2} 
               className="task-card-paper" 
