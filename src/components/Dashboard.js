@@ -591,38 +591,19 @@ export default function Dashboard() {
     };
   }, [showNotification]);
 
-  // Initialize badge on app launch and clear on focus/visibility
+  // Initialize badge on app launch - restore from IndexedDB
   useEffect(() => {
-    // Initialize badge on mount
+    // Initialize badge on mount - this will restore badge count from IndexedDB
+    // Badge will show on app icon so user can see notification count
     initializeBadge().catch((error) => {
       console.error("[Dashboard] Error initializing badge:", error);
     });
 
-    // Clear badge when app gains focus (user opens the app)
-    const handleFocus = () => {
-      console.log("[Dashboard] 📱 App focused - clearing badge");
-      clearAppBadge().catch((error) => {
-        console.error("[Dashboard] Error clearing badge on focus:", error);
-      });
-    };
-
-    // Clear badge when visibility changes to visible (user opens the app)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("[Dashboard] 📱 App became visible - clearing badge");
-        clearAppBadge().catch((error) => {
-          console.error("[Dashboard] Error clearing badge on visibility change:", error);
-        });
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    // Don't clear badge on focus/visibility - let user see the badge count
+    // Badge will be cleared when:
+    // 1. User clicks on notification (handled in NotificationPopup)
+    // 2. User clicks on system notification (handled in service worker)
+    // 3. User views dashboard and interacts with app
   }, []);
 
 

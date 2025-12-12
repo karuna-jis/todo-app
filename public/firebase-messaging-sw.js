@@ -62,46 +62,10 @@ const setBadgeCountInStorage = async (count) => {
   }
 };
 
-// Increment badge in service worker (works even when app is closed)
-const incrementBadgeInSW = async () => {
-  try {
-    // Check if Badge API is supported
-    if ('setAppBadge' in self.navigator && 'clearAppBadge' in self.navigator) {
-      const currentCount = await getBadgeCountFromStorage();
-      const newCount = currentCount + 1;
-      
-      console.log(`[SW Badge] 📈 Incrementing badge: ${currentCount} → ${newCount}`);
-      
-      // Set badge using Badge API
-      await self.navigator.setAppBadge(newCount);
-      console.log(`[SW Badge] ✅ Badge set to ${newCount} (Badge API in Service Worker)`);
-      
-      // Store count in IndexedDB
-      await setBadgeCountInStorage(newCount);
-      
-      return newCount;
-    } else {
-      // Badge API not supported, just store count
-      const currentCount = await getBadgeCountFromStorage();
-      const newCount = currentCount + 1;
-      await setBadgeCountInStorage(newCount);
-      console.log(`[SW Badge] ⚠️ Badge API not supported, stored count: ${newCount}`);
-      return newCount;
-    }
-  } catch (error) {
-    console.error('[SW Badge] ❌ Error incrementing badge:', error);
-    // Fallback: try to store count anyway
-    try {
-      const currentCount = await getBadgeCountFromStorage();
-      const newCount = currentCount + 1;
-      await setBadgeCountInStorage(newCount);
-      return newCount;
-    } catch (e) {
-      console.error('[SW Badge] ❌ Error storing badge count:', e);
-      return 0;
-    }
-  }
-};
+// NOTE: Service workers cannot directly use navigator.setAppBadge()
+// Service workers can only store badge count in IndexedDB
+// When app opens, it will read from IndexedDB and set badge using Badge API
+// This function is kept for compatibility but uses the new incrementBadgeCountInDB function
 
 const firebaseConfig = {
   apiKey: "AIzaSyBDxGeqSk1xheSRAtk6HTZNcKqC_LNankE",
