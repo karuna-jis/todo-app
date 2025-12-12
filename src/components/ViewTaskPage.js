@@ -514,7 +514,7 @@ const addTask = async () => {
           <div className="d-flex align-items-center" style={{ gap: "10px" }}>
             <button
               className="btn btn-light back-btn-responsive"
-              style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0, marginLeft: "-12px" }}
+              style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0 }}
               onClick={() => window.history.back()}
             >
               ←
