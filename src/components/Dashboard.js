@@ -528,10 +528,8 @@ export default function Dashboard() {
         timestamp: payload.data?.timestamp || Date.now(),
       });
 
-      // Increment badge count when foreground notification arrives
-      incrementBadge().catch((error) => {
-        console.error("[Dashboard] Error incrementing badge:", error);
-      });
+      // Note: Badge increment is handled by Firestore listener (onSnapshot)
+      // This prevents duplicate badge increments when both FCM and Firestore detect the same task
     });
 
     return () => {
@@ -756,6 +754,12 @@ export default function Dashboard() {
                 addedByName: taskData.createdByName || addedBy,
                 link: `/view/${projectId}/${encodeURIComponent(project.name)}`,
                 timestamp: taskData.createdAt?.toMillis?.() || Date.now(),
+              });
+
+              // Increment badge count when new task is detected via Firestore listener
+              // This ensures badge shows immediately when task is added
+              incrementBadge().catch((error) => {
+                console.error("[Dashboard] Error incrementing badge on new task:", error);
               });
             }
           }

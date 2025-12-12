@@ -87,38 +87,122 @@ export const incrementBadge = async () => {
 };
 
 /**
+ * Clear badge count from IndexedDB
+ */
+const clearBadgeCountFromIndexedDB = async () => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('badge_db', 1);
+      request.onsuccess = () => {
+        const db = request.result;
+        if (db.objectStoreNames.contains('badge_count')) {
+          const transaction = db.transaction(['badge_count'], 'readwrite');
+          const store = transaction.objectStore('badge_count');
+          store.put({ id: 'badge_count', count: 0 });
+          console.log('[Badge] ✅ Badge count cleared in IndexedDB');
+        }
+        resolve();
+      };
+      request.onerror = () => resolve();
+    } catch (error) {
+      console.log('[Badge] ⚠️ Error clearing IndexedDB:', error);
+      resolve();
+    }
+  });
+};
+
+/**
  * Clear app badge (set to 0)
  */
 export const clearAppBadge = async () => {
   await setAppBadge(0);
+  // Also clear IndexedDB
+  await clearBadgeCountFromIndexedDB();
+};
+
+/**
+ * Get badge count from IndexedDB (set by service worker when app is closed)
+ */
+const getBadgeCountFromIndexedDB = async () => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('badge_db', 1);
+      request.onsuccess = () => {
+        const db = request.result;
+        if (db.objectStoreNames.contains('badge_count')) {
+          const transaction = db.transaction(['badge_count'], 'readonly');
+          const store = transaction.objectStore('badge_count');
+          const getRequest = store.get('badge_count');
+          getRequest.onsuccess = () => {
+            const result = getRequest.result;
+            const count = result ? result.count : 0;
+            console.log('[Badge] 📱 Badge count from IndexedDB:', count);
+            resolve(count);
+          };
+          getRequest.onerror = () => {
+            console.log('[Badge] ⚠️ Error reading from IndexedDB, using localStorage');
+            resolve(0);
+          };
+        } else {
+          resolve(0);
+        }
+      };
+      request.onerror = () => {
+        console.log('[Badge] ⚠️ IndexedDB not available, using localStorage');
+        resolve(0);
+      };
+    } catch (error) {
+      console.log('[Badge] ⚠️ IndexedDB error, using localStorage:', error);
+      resolve(0);
+    }
+  });
+};
+
+/**
+ * Sync badge count from IndexedDB to localStorage
+ */
+const syncBadgeCountFromIndexedDB = async () => {
+  const indexedDBCount = await getBadgeCountFromIndexedDB();
+  const localStorageCount = getBadgeCount();
+  
+  if (indexedDBCount > localStorageCount) {
+    // IndexedDB has higher count (from service worker), use that
+    console.log(`[Badge] 🔄 Syncing badge count: IndexedDB (${indexedDBCount}) > localStorage (${localStorageCount})`);
+    setBadgeCountStorage(indexedDBCount);
+    return indexedDBCount;
+  }
+  
+  return localStorageCount;
 };
 
 /**
  * Initialize badge on app launch
  * - Clears badge if app is focused/visible AND count is 0
  * - Restores badge count if app was in background
+ * - Syncs with IndexedDB (set by service worker when app is closed)
  */
 export const initializeBadge = async () => {
-  const count = getBadgeCount();
-  console.log('[Badge] 🔄 Initializing badge, current count:', count);
+  // First, sync badge count from IndexedDB (service worker storage)
+  const syncedCount = await syncBadgeCountFromIndexedDB();
+  console.log('[Badge] 🔄 Initializing badge, synced count:', syncedCount);
   
   // Check if app is visible/focused
   if (document.visibilityState === 'visible' || document.hasFocus()) {
     // Only clear if count is 0 (fresh start)
     // Don't clear if badge was set while app was in background
-    if (count === 0) {
+    if (syncedCount === 0) {
       await clearAppBadge();
       console.log('[Badge] ✅ App launched - badge cleared (count was 0)');
     } else {
       // Restore badge count
-      await setAppBadge(count);
-      console.log(`[Badge] ✅ App launched - badge restored to ${count}`);
+      await setAppBadge(syncedCount);
+      console.log(`[Badge] ✅ App launched - badge restored to ${syncedCount} (from IndexedDB/localStorage)`);
     }
   } else {
     // App might be in background, restore badge count
-    if (count > 0) {
-      await setAppBadge(count);
-      console.log(`[Badge] ✅ App in background - badge restored to ${count}`);
+    if (syncedCount > 0) {
+      await setAppBadge(syncedCount);
+      console.log(`[Badge] ✅ App in background - badge restored to ${syncedCount}`);
     }
   }
 };
