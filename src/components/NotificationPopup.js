@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./NotificationPopup.css";
+import { clearAppBadge } from "../utils/badge";
 
 const NotificationPopup = ({ notification, onClose }) => {
   const navigate = useNavigate();
@@ -69,6 +70,11 @@ const NotificationPopup = ({ notification, onClose }) => {
   };
 
   const handleClick = () => {
+    // Clear badge when notification is clicked
+    clearAppBadge().catch((error) => {
+      console.error("[NotificationPopup] Error clearing badge:", error);
+    });
+
     if (notification?.data?.link) {
       // Navigate to the link
       navigate(notification.data.link);

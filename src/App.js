@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "../node_modules/bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import {
@@ -12,8 +12,16 @@ import Login from "./components/Login.js";
 import Dashboard from "./components/Dashboard.js";
 import ViewTaskPage from "./components/ViewTaskPage.js";
 import ProjectBoard from "./components/ProjectBoard.js";
+import { initializeBadge } from "./utils/badge";
 
 function App() {
+  // Initialize badge on app launch
+  useEffect(() => {
+    initializeBadge().catch((error) => {
+      console.error("[App] Error initializing badge:", error);
+    });
+  }, []);
+
   return (
     <Router>
       <NotificationProvider>

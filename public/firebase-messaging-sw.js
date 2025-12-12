@@ -226,6 +226,33 @@ if (!messaging) {
       return self.registration.showNotification(notificationTitle, notificationOptions)
         .then(() => {
           console.log("[SW] ✅ Background notification shown successfully with popup style and sound!");
+          
+          // Send message to all open clients to increment badge
+          return self.clients.matchAll({ type: "window", includeUncontrolled: true })
+            .then((clientList) => {
+              if (clientList.length > 0) {
+                console.log(`[SW] 📢 Sending badge increment message to ${clientList.length} client(s)`);
+                clientList.forEach((client) => {
+                  client.postMessage({
+                    type: "INC_BADGE",
+                    payload: {
+                      projectId: payload.data?.projectId || "",
+                      projectName: payload.data?.projectName || "",
+                      taskId: payload.data?.taskId || "",
+                      taskName: payload.data?.taskName || "",
+                      addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+                      addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
+                      link: payload.fcmOptions?.link || payload.data?.link || "",
+                      timestamp: Date.now()
+                    }
+                  }).catch((err) => {
+                    console.log("[SW] ⚠️ Could not send message to client:", err);
+                  });
+                });
+              } else {
+                console.log("[SW] ℹ️ No open clients to send badge increment message");
+              }
+            });
         })
         .catch((error) => {
           console.error("[SW] ❌ Error showing background notification:", error);
@@ -335,6 +362,33 @@ self.addEventListener("push", (event) => {
     return self.registration.showNotification(notificationTitle, notificationOptions)
       .then(() => {
         console.log("[SW] ✅ Push notification shown successfully with popup style and sound!");
+        
+        // Send message to all open clients to increment badge
+        return self.clients.matchAll({ type: "window", includeUncontrolled: true })
+          .then((clientList) => {
+            if (clientList.length > 0) {
+              console.log(`[SW] 📢 Sending badge increment message to ${clientList.length} client(s)`);
+              clientList.forEach((client) => {
+                client.postMessage({
+                  type: "INC_BADGE",
+                  payload: {
+                    projectId: payload.data?.projectId || "",
+                    projectName: payload.data?.projectName || "",
+                    taskId: payload.data?.taskId || "",
+                    taskName: payload.data?.taskName || "",
+                    addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+                    addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
+                    link: payload.fcmOptions?.link || payload.data?.link || "",
+                    timestamp: Date.now()
+                  }
+                }).catch((err) => {
+                  console.log("[SW] ⚠️ Could not send message to client:", err);
+                });
+              });
+            } else {
+              console.log("[SW] ℹ️ No open clients to send badge increment message");
+            }
+          });
       })
       .catch((error) => {
         console.error("[SW] ❌ Error showing push notification:", error);
@@ -362,6 +416,21 @@ self.addEventListener("notificationclick", (event) => {
   
   // Default action or "view" action - open the app
   event.notification.close();
+
+  // Clear badge when notification is clicked
+  self.clients.matchAll({ type: "window", includeUncontrolled: true })
+    .then((clientList) => {
+      if (clientList.length > 0) {
+        console.log("[SW] 📢 Sending badge clear message to clients");
+        clientList.forEach((client) => {
+          client.postMessage({
+            type: "CLEAR_BADGE"
+          }).catch((err) => {
+            console.log("[SW] ⚠️ Could not send clear badge message to client:", err);
+          });
+        });
+      }
+    });
 
   // Get URL from fcmOptions.link (absolute URL from backend) or construct from data
   let urlToOpen = data.link || "/dashboard";

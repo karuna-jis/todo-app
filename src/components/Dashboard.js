@@ -26,6 +26,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
+import { incrementBadge, clearAppBadge, initializeBadge } from "../utils/badge";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -509,12 +510,96 @@ export default function Dashboard() {
         link: payload.data?.link || "",
         timestamp: payload.data?.timestamp || Date.now(),
       });
+
+      // Increment badge count when foreground notification arrives
+      incrementBadge().catch((error) => {
+        console.error("[Dashboard] Error incrementing badge:", error);
+      });
     });
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
   }, [showNotification]);
+
+  // Listen for service worker messages (background notifications)
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+
+    const handleMessage = (event) => {
+      console.log("[Dashboard] 📨 Message from service worker:", event.data);
+
+      if (event.data?.type === "INC_BADGE") {
+        // Increment badge when background notification arrives
+        incrementBadge().catch((error) => {
+          console.error("[Dashboard] Error incrementing badge from SW message:", error);
+        });
+
+        // Also show notification popup if app is open
+        if (event.data.payload) {
+          const payload = event.data.payload;
+          const addedBy = payload.addedByName || payload.addedBy || "Unknown";
+          const taskName = payload.taskName || "New Task";
+
+          showNotification({
+            title: "New Task Added",
+            body: `${addedBy} added new task: ${taskName}`,
+            projectId: payload.projectId || "",
+            projectName: payload.projectName || "",
+            taskId: payload.taskId || "",
+            taskName: taskName,
+            addedBy: payload.addedBy || "",
+            addedByName: addedBy,
+            link: payload.link || "",
+            timestamp: payload.timestamp || Date.now(),
+          });
+        }
+      } else if (event.data?.type === "CLEAR_BADGE") {
+        // Clear badge when notification is clicked
+        clearAppBadge().catch((error) => {
+          console.error("[Dashboard] Error clearing badge from SW message:", error);
+        });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
+  }, [showNotification]);
+
+  // Initialize badge on app launch and clear on focus
+  useEffect(() => {
+    // Initialize badge on mount
+    initializeBadge().catch((error) => {
+      console.error("[Dashboard] Error initializing badge:", error);
+    });
+
+    // Clear badge when app gains focus
+    const handleFocus = () => {
+      clearAppBadge().catch((error) => {
+        console.error("[Dashboard] Error clearing badge on focus:", error);
+      });
+    };
+
+    // Clear badge when visibility changes to visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        clearAppBadge().catch((error) => {
+          console.error("[Dashboard] Error clearing badge on visibility change:", error);
+        });
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
 
   // LOAD PROJECTS (realtime)
