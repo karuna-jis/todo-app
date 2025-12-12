@@ -26,7 +26,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
-import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported, initializeBadge } from "../utils/badge";
+import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported } from "../utils/badge";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -591,20 +591,45 @@ export default function Dashboard() {
     };
   }, [showNotification]);
 
-  // Initialize badge on app launch - restore from IndexedDB
+  // Initialize badge on app launch (only once, not on every focus)
   useEffect(() => {
-    // Initialize badge on mount - this will restore badge count from IndexedDB
-    // Badge will show on app icon so user can see notification count
-    initializeBadge().catch((error) => {
-      console.error("[Dashboard] Error initializing badge:", error);
-    });
+    // Initialize badge on mount (only clears if app is already visible)
+    // Don't clear on every focus - only on initial load
+    const initBadge = async () => {
+      try {
+        // Check if Badge API is supported
+        const isSupported = 'setAppBadge' in navigator && 'clearAppBadge' in navigator;
+        console.log("[Dashboard] Badge API supported:", isSupported);
+        
+        if (isSupported) {
+          // Only clear badge if app is visible AND this is the first load
+          // Don't clear on every focus - let badge persist until user interacts
+          const count = getBadgeCount();
+          console.log("[Dashboard] Current badge count from storage:", count);
+          
+          // If app is visible on first load, clear badge
+          // But don't clear if badge was just incremented
+          if (document.visibilityState === "visible" && count === 0) {
+            await clearAppBadge();
+            console.log("[Dashboard] ✅ Badge cleared on initial load (app visible)");
+          } else if (count > 0) {
+            // Restore badge count if it exists
+            await setAppBadge(count);
+            console.log(`[Dashboard] ✅ Badge restored to ${count}`);
+          }
+        } else {
+          console.log("[Dashboard] ⚠️ Badge API not supported in this browser");
+        }
+      } catch (error) {
+        console.error("[Dashboard] Error initializing badge:", error);
+      }
+    };
 
-    // Don't clear badge on focus/visibility - let user see the badge count
-    // Badge will be cleared when:
-    // 1. User clicks on notification (handled in NotificationPopup)
-    // 2. User clicks on system notification (handled in service worker)
-    // 3. User views dashboard and interacts with app
-  }, []);
+    initBadge();
+  }, []); // Only run once on mount
+
+  // Clear badge only when user clicks notification (handled in NotificationPopup)
+  // Don't clear on focus/visibility change - let badge persist
 
 
   // LOAD PROJECTS (realtime)

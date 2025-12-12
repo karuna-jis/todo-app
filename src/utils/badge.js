@@ -177,23 +177,33 @@ const syncBadgeCountFromIndexedDB = async () => {
 
 /**
  * Initialize badge on app launch
- * - Restores badge count from IndexedDB when app opens (so user can see notifications)
- * - Badge will be cleared when user interacts with notifications or opens dashboard
+ * - Clears badge if app is focused/visible AND count is 0
+ * - Restores badge count if app was in background
  * - Syncs with IndexedDB (set by service worker when app is closed)
  */
 export const initializeBadge = async () => {
   // First, sync badge count from IndexedDB (service worker storage)
   const syncedCount = await syncBadgeCountFromIndexedDB();
-  console.log('[Badge] 🔄 Initializing badge, synced count from IndexedDB:', syncedCount);
+  console.log('[Badge] 🔄 Initializing badge, synced count:', syncedCount);
   
-  // Always restore badge count when app opens (so user can see it on app icon)
-  // Don't clear immediately - let user see how many notifications they have
-  if (syncedCount > 0) {
-    await setAppBadge(syncedCount);
-    console.log(`[Badge] ✅ App opened - badge restored to ${syncedCount} (user can see notification count on app icon)`);
+  // Check if app is visible/focused
+  if (document.visibilityState === 'visible' || document.hasFocus()) {
+    // Only clear if count is 0 (fresh start)
+    // Don't clear if badge was set while app was in background
+    if (syncedCount === 0) {
+      await clearAppBadge();
+      console.log('[Badge] ✅ App launched - badge cleared (count was 0)');
+    } else {
+      // Restore badge count
+      await setAppBadge(syncedCount);
+      console.log(`[Badge] ✅ App launched - badge restored to ${syncedCount} (from IndexedDB/localStorage)`);
+    }
   } else {
-    await clearAppBadge();
-    console.log('[Badge] ✅ App opened - badge cleared (no notifications)');
+    // App might be in background, restore badge count
+    if (syncedCount > 0) {
+      await setAppBadge(syncedCount);
+      console.log(`[Badge] ✅ App in background - badge restored to ${syncedCount}`);
+    }
   }
 };
 
