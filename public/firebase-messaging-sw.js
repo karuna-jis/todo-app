@@ -326,9 +326,33 @@ if (!messaging) {
     console.log("[SW] Data object:", payload.data);
     console.log("[SW] Webpush object:", payload.webpush);
 
-    // Extract notification details - prioritize notification object, fallback to data
-    const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
-    const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+    // Extract notification details with all information
+    const taskName = payload.data?.taskName || payload.data?.text || "New Task";
+    const addedByName = payload.data?.addedByName || payload.data?.createdByName || "";
+    const addedBy = payload.data?.addedBy || payload.data?.createdBy || "";
+    const projectName = payload.data?.projectName || "Project";
+    
+    // Build detailed notification title and body (like dashboard popup)
+    const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Added";
+    
+    // Create detailed body with all information: User, Task, Project
+    let notificationBody = "";
+    if (addedByName || addedBy) {
+      const userName = addedByName || addedBy.split('@')[0] || "Someone";
+      notificationBody = `${userName} added new task`;
+    } else {
+      notificationBody = "New task added";
+    }
+    
+    // Add task name
+    if (taskName && taskName !== "New Task") {
+      notificationBody += `: ${taskName}`;
+    }
+    
+    // Add project name in a new line format (will show in notification)
+    if (projectName && projectName !== "Project") {
+      notificationBody += `\n📁 Project: ${projectName}`;
+    }
     
     // Create unique tag to prevent duplicates - combine taskId, projectId, and timestamp
     const taskId = payload.data?.taskId || "";
@@ -363,14 +387,19 @@ if (!messaging) {
         image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
         data: {
           ...payload.data,
-          // Ensure all data fields are preserved
-          projectId: payload.data?.projectId || "",
-          projectName: payload.data?.projectName || "",
-          taskId: payload.data?.taskId || "",
-          taskName: payload.data?.taskName || "",
-          addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
-          addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
-          link: payload.fcmOptions?.link || payload.data?.link || ""
+          // Ensure all data fields are preserved with proper values
+          projectId: projectId || payload.data?.projectId || "",
+          projectName: projectName || payload.data?.projectName || "",
+          taskId: taskId || payload.data?.taskId || "",
+          taskName: taskName || payload.data?.taskName || "",
+          addedBy: addedBy || payload.data?.addedBy || payload.data?.createdBy || "",
+          addedByName: addedByName || payload.data?.addedByName || payload.data?.createdByName || "",
+          createdBy: addedBy || payload.data?.addedBy || payload.data?.createdBy || "",
+          createdByName: addedByName || payload.data?.addedByName || payload.data?.createdByName || "",
+          link: payload.fcmOptions?.link || payload.data?.link || "",
+          // Store formatted notification details
+          notificationTitle: notificationTitle,
+          notificationBody: notificationBody
         },
         tag: uniqueTag, // Unique tag to prevent duplicates
         requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
@@ -394,12 +423,16 @@ if (!messaging) {
         ]
       };
 
-      console.log("[SW] Notification title:", notificationTitle);
-      console.log("[SW] Notification body:", notificationBody);
-      console.log("[SW] Unique tag:", uniqueTag);
-      console.log("[SW] Silent:", notificationOptions.silent, "(false = sound enabled)");
-      console.log("[SW] Vibrate:", notificationOptions.vibrate);
-      console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+      console.log("[SW] 📱 Background Notification Details:");
+      console.log("[SW]   Title:", notificationTitle);
+      console.log("[SW]   Body:", notificationBody);
+      console.log("[SW]   Task:", taskName);
+      console.log("[SW]   Added By:", addedByName || addedBy);
+      console.log("[SW]   Project:", projectName);
+      console.log("[SW]   Unique tag:", uniqueTag);
+      console.log("[SW]   Silent:", notificationOptions.silent, "(false = sound enabled)");
+      console.log("[SW]   Vibrate:", notificationOptions.vibrate);
+      console.log("[SW] Full notification options:", JSON.stringify(notificationOptions, null, 2));
 
       // CRITICAL: Always show notification when app is closed
       // Show notification with popup style and sound
@@ -480,8 +513,33 @@ self.addEventListener("push", (event) => {
     payload = { data: { body: event.data.text() } };
   }
 
+  // Extract notification details with all information
+  const taskName = payload.data?.taskName || payload.data?.text || "New Task";
+  const addedByName = payload.data?.addedByName || payload.data?.createdByName || "";
+  const addedBy = payload.data?.addedBy || payload.data?.createdBy || "";
+  const projectName = payload.data?.projectName || "Project";
+  
+  // Build detailed notification title and body (like dashboard popup)
   const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Added";
-  const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
+  
+  // Create detailed body with all information: User, Task, Project
+  let notificationBody = "";
+  if (addedByName || addedBy) {
+    const userName = addedByName || addedBy.split('@')[0] || "Someone";
+    notificationBody = `${userName} added new task`;
+  } else {
+    notificationBody = "New task added";
+  }
+  
+  // Add task name
+  if (taskName && taskName !== "New Task") {
+    notificationBody += `: ${taskName}`;
+  }
+  
+  // Add project name in a new line format (will show in notification)
+  if (projectName && projectName !== "Project") {
+    notificationBody += `\n📁 Project: ${projectName}`;
+  }
   
   // Create unique tag to prevent duplicates
   const taskId = payload.data?.taskId || "";
@@ -515,11 +573,19 @@ self.addEventListener("push", (event) => {
       silent: false, // CRITICAL: Must be false for browser to play default notification sound
       data: {
         ...payload.data,
-        projectId: payload.data?.projectId || "",
-        projectName: payload.data?.projectName || "",
-        taskId: payload.data?.taskId || "",
-        taskName: payload.data?.taskName || "",
-        link: payload.fcmOptions?.link || payload.data?.link || ""
+        // Ensure all data fields are preserved with proper values
+        projectId: projectId || payload.data?.projectId || "",
+        projectName: projectName || payload.data?.projectName || "",
+        taskId: taskId || payload.data?.taskId || "",
+        taskName: taskName || payload.data?.taskName || "",
+        addedBy: addedBy || payload.data?.addedBy || payload.data?.createdBy || "",
+        addedByName: addedByName || payload.data?.addedByName || payload.data?.createdByName || "",
+        createdBy: addedBy || payload.data?.addedBy || payload.data?.createdBy || "",
+        createdByName: addedByName || payload.data?.addedByName || payload.data?.createdByName || "",
+        link: payload.fcmOptions?.link || payload.data?.link || "",
+        // Store formatted notification details
+        notificationTitle: notificationTitle,
+        notificationBody: notificationBody
       },
       tag: uniqueTag, // Unique tag to prevent duplicates
       requireInteraction: true, // CRITICAL: Keep notification visible (popup style)
@@ -538,9 +604,14 @@ self.addEventListener("push", (event) => {
       ]
     };
 
-    console.log("[SW] Showing push notification:", notificationTitle);
-    console.log("[SW] Unique tag:", uniqueTag);
-    console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+    console.log("[SW] 📱 Push Notification Details:");
+    console.log("[SW]   Title:", notificationTitle);
+    console.log("[SW]   Body:", notificationBody);
+    console.log("[SW]   Task:", taskName);
+    console.log("[SW]   Added By:", addedByName || addedBy);
+    console.log("[SW]   Project:", projectName);
+    console.log("[SW]   Unique tag:", uniqueTag);
+    console.log("[SW] Full notification options:", JSON.stringify(notificationOptions, null, 2));
 
     return self.registration.showNotification(notificationTitle, notificationOptions)
       .then(async () => {
