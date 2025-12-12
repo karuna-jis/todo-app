@@ -215,8 +215,36 @@ export default function Dashboard() {
     let hasAuthenticated = false;
     let authTime = null; // Track when user authenticated
     let navigationTimeout = null;
+    let authStateRestored = false; // Track if auth state has been restored from persistence
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // First check: Wait for auth state to be restored from persistence
+      // This prevents false logouts when auth state is being restored
+      if (!authStateRestored) {
+        authStateRestored = true;
+        // Give Firebase time to restore auth state from localStorage
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Re-check user after waiting
+        const currentUser = auth.currentUser;
+        if (!currentUser && !user) {
+          // Auth state restored and no user found - this is a real logout
+          if (isMounted) {
+            setAuthChecked(true);
+            // Only navigate if we're on a protected route
+            if (location.pathname !== "/") {
+              console.log("🔄 No authenticated user found, navigating to login...");
+              navigate("/");
+            }
+          }
+          return;
+        }
+        // If user exists after restoration, continue with normal flow
+        if (currentUser && !user) {
+          // Auth was restored, user exists
+          user = currentUser;
+        }
+      }
+      
       if (!user) {
         // Clear any pending navigation
         if (navigationTimeout) {
@@ -230,19 +258,24 @@ export default function Dashboard() {
         }
         
         // Only navigate if:
-        // 1. We were previously authenticated
-        // 2. At least 3 seconds have passed since authentication (to prevent premature navigation)
-        // 3. We're currently on the dashboard route
-        if (hasAuthenticated && isMounted && authTime) {
+        // 1. We were previously authenticated (not initial load)
+        // 2. At least 5 seconds have passed since authentication (to prevent premature navigation)
+        // 3. We're currently on a protected route
+        // 4. Auth state has been restored (not during initial restoration)
+        if (hasAuthenticated && isMounted && authTime && authStateRestored) {
           const timeSinceAuth = Date.now() - authTime;
-          const minTimeBeforeLogout = 3000; // 3 seconds minimum
+          const minTimeBeforeLogout = 5000; // 5 seconds minimum (increased for mobile)
           
-          if (timeSinceAuth >= minTimeBeforeLogout && location.pathname === "/dashboard") {
+          if (timeSinceAuth >= minTimeBeforeLogout && location.pathname !== "/") {
             console.log("🔄 User logged out, navigating to login...");
             navigate("/");
           } else {
-            console.log("⏸️ Preventing premature navigation (too soon after login)");
+            console.log("⏸️ Preventing premature navigation (too soon after login or during auth restoration)");
           }
+        } else if (authStateRestored && location.pathname !== "/") {
+          // Auth state restored but no user - navigate to login
+          console.log("🔄 No authenticated user, navigating to login...");
+          navigate("/");
         }
         return;
       }

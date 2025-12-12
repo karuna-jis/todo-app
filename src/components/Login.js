@@ -6,7 +6,8 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   signInWithRedirect,
-  getRedirectResult 
+  getRedirectResult,
+  onAuthStateChanged
 } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +16,38 @@ import Swal from "sweetalert2";
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  // Helper function to check if email exists in Firestore
+  const checkEmailInFirestore = async (userEmail) => {
+    const q = query(collection(db, "users"), where("email", "==", userEmail));
+    const snap = await getDocs(q);
+    return !snap.empty;
+  };
+
+  // Check if user is already authenticated (persistent login)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is already logged in, check if they exist in Firestore
+        try {
+          const exists = await checkEmailInFirestore(user.email);
+          if (exists) {
+            // User is authenticated and exists in Firestore, redirect to dashboard
+            console.log("✅ User already authenticated, redirecting to dashboard");
+            navigate("/dashboard");
+          } else {
+            // User authenticated but not in Firestore, sign them out
+            console.log("⚠️ User not in Firestore, signing out");
+            await auth.signOut();
+          }
+        } catch (error) {
+          console.error("Error checking user in Firestore:", error);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
 
   // Check for redirect result on component mount
   useEffect(() => {
@@ -47,12 +80,6 @@ export default function Login() {
 
     checkRedirectResult();
   }, [navigate]);
-
-  const checkEmailInFirestore = async (userEmail) => {
-    const q = query(collection(db, "users"), where("email", "==", userEmail));
-    const snap = await getDocs(q);
-    return !snap.empty;
-  };
 
   const handleGoogleLogin = async () => {
     // Prevent multiple simultaneous clicks
