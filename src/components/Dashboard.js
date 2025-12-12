@@ -26,7 +26,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
-import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported } from "../utils/badge";
+import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported, initializeBadge } from "../utils/badge";
 
 export default function Dashboard() {
   const navigate = useNavigate();
