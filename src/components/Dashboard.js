@@ -26,7 +26,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
-import { incrementBadge, clearAppBadge, initializeBadge } from "../utils/badge";
+import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported } from "../utils/badge";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -217,8 +217,15 @@ export default function Dashboard() {
     let authTime = null; // Track when user authenticated
     let navigationTimeout = null;
     let authStateRestored = false; // Track if auth state has been restored from persistence
+    let intentionalLogout = false; // Track if logout was intentional (via logout button)
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Check if logout was intentional (set by handleLogout)
+      if (window.__intentionalLogout) {
+        intentionalLogout = true;
+        window.__intentionalLogout = false; // Reset
+      }
+      
       // First check: Wait for auth state to be restored from persistence
       // This prevents false logouts when auth state is being restored
       if (!authStateRestored) {
@@ -258,25 +265,21 @@ export default function Dashboard() {
           setAuthChecked(true);
         }
         
-        // Only navigate if:
-        // 1. We were previously authenticated (not initial load)
-        // 2. At least 5 seconds have passed since authentication (to prevent premature navigation)
-        // 3. We're currently on a protected route
-        // 4. Auth state has been restored (not during initial restoration)
-        if (hasAuthenticated && isMounted && authTime && authStateRestored) {
-          const timeSinceAuth = Date.now() - authTime;
-          const minTimeBeforeLogout = 5000; // 5 seconds minimum (increased for mobile)
-          
-          if (timeSinceAuth >= minTimeBeforeLogout && location.pathname !== "/") {
-            console.log("🔄 User logged out, navigating to login...");
-            navigate("/");
-          } else {
-            console.log("⏸️ Preventing premature navigation (too soon after login or during auth restoration)");
-          }
-        } else if (authStateRestored && location.pathname !== "/") {
-          // Auth state restored but no user - navigate to login
-          console.log("🔄 No authenticated user, navigating to login...");
+        // Only navigate to login if logout was intentional (via logout button)
+        // Don't navigate on back button press or accidental navigation
+        if (intentionalLogout && isMounted) {
+          console.log("🔄 Intentional logout, navigating to login...");
           navigate("/");
+          intentionalLogout = false; // Reset flag
+        } else if (authStateRestored && location.pathname !== "/" && !hasAuthenticated) {
+          // Only navigate if auth state restored, no user found, and user was never authenticated
+          // This handles initial load when user is not logged in
+          console.log("🔄 No authenticated user on initial load, navigating to login...");
+          navigate("/");
+        } else {
+          // User pressed back button or navigation happened - don't logout
+          // Keep user on current page, auth state will be restored
+          console.log("⏸️ Preventing navigation - back button or accidental navigation detected");
         }
         return;
       }
@@ -481,11 +484,25 @@ export default function Dashboard() {
       }
     });
 
+    // Prevent back button from navigating to login if user is authenticated
+    const handlePopState = (event) => {
+      if (auth.currentUser && location.pathname === "/") {
+        // User is authenticated but back button tried to go to login
+        // Prevent this and redirect to dashboard
+        console.log("🚫 Back button prevented - user is authenticated, redirecting to dashboard");
+        event.preventDefault();
+        navigate("/dashboard", { replace: true });
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
     return () => {
       isMounted = false;
       if (navigationTimeout) {
         clearTimeout(navigationTimeout);
       }
+      window.removeEventListener("popstate", handlePopState);
       unsubscribe();
     };
   }, [navigate, location.pathname]);
@@ -569,37 +586,45 @@ export default function Dashboard() {
     };
   }, [showNotification]);
 
-  // Initialize badge on app launch and clear on focus
+  // Initialize badge on app launch (only once, not on every focus)
   useEffect(() => {
-    // Initialize badge on mount
-    initializeBadge().catch((error) => {
-      console.error("[Dashboard] Error initializing badge:", error);
-    });
-
-    // Clear badge when app gains focus
-    const handleFocus = () => {
-      clearAppBadge().catch((error) => {
-        console.error("[Dashboard] Error clearing badge on focus:", error);
-      });
-    };
-
-    // Clear badge when visibility changes to visible
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        clearAppBadge().catch((error) => {
-          console.error("[Dashboard] Error clearing badge on visibility change:", error);
-        });
+    // Initialize badge on mount (only clears if app is already visible)
+    // Don't clear on every focus - only on initial load
+    const initBadge = async () => {
+      try {
+        // Check if Badge API is supported
+        const isSupported = 'setAppBadge' in navigator && 'clearAppBadge' in navigator;
+        console.log("[Dashboard] Badge API supported:", isSupported);
+        
+        if (isSupported) {
+          // Only clear badge if app is visible AND this is the first load
+          // Don't clear on every focus - let badge persist until user interacts
+          const count = getBadgeCount();
+          console.log("[Dashboard] Current badge count from storage:", count);
+          
+          // If app is visible on first load, clear badge
+          // But don't clear if badge was just incremented
+          if (document.visibilityState === "visible" && count === 0) {
+            await clearAppBadge();
+            console.log("[Dashboard] ✅ Badge cleared on initial load (app visible)");
+          } else if (count > 0) {
+            // Restore badge count if it exists
+            await setAppBadge(count);
+            console.log(`[Dashboard] ✅ Badge restored to ${count}`);
+          }
+        } else {
+          console.log("[Dashboard] ⚠️ Badge API not supported in this browser");
+        }
+      } catch (error) {
+        console.error("[Dashboard] Error initializing badge:", error);
       }
     };
 
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    initBadge();
+  }, []); // Only run once on mount
 
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
+  // Clear badge only when user clicks notification (handled in NotificationPopup)
+  // Don't clear on focus/visibility change - let badge persist
 
 
   // LOAD PROJECTS (realtime)
@@ -1067,6 +1092,9 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
+    // Mark logout as intentional before signing out
+    // This flag will be checked in auth listener
+    window.__intentionalLogout = true;
     await signOut(auth);
     navigate("/");
   };

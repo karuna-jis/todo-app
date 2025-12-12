@@ -45,11 +45,16 @@ const setBadgeCountStorage = (count) => {
 export const setAppBadge = async (count) => {
   if (count < 0) count = 0;
   
+  console.log(`[Badge] 🔧 Setting badge to ${count}...`);
+  console.log(`[Badge] Badge API supported: ${isBadgeSupported()}`);
+  console.log(`[Badge] Current localStorage count: ${getBadgeCount()}`);
+  
   if (isBadgeSupported()) {
     try {
       if (count > 0) {
         await navigator.setAppBadge(count);
         console.log(`[Badge] ✅ Badge set to ${count} (Badge API)`);
+        console.log(`[Badge] Check app icon - badge should show ${count}`);
       } else {
         await navigator.clearAppBadge();
         console.log('[Badge] ✅ Badge cleared (Badge API)');
@@ -58,12 +63,14 @@ export const setAppBadge = async (count) => {
       setBadgeCountStorage(count);
     } catch (error) {
       console.error('[Badge] ❌ Error setting badge via Badge API:', error);
+      console.error('[Badge] Error details:', error.message);
       // Fallback to localStorage
       setBadgeCountStorage(count);
     }
   } else {
     // Fallback: store in localStorage
-    console.log(`[Badge] ⚠️ Badge API not supported, using localStorage (count: ${count})`);
+    console.log(`[Badge] ⚠️ Badge API not supported in this browser`);
+    console.log(`[Badge] Storing count ${count} in localStorage (will show when Badge API is supported)`);
     setBadgeCountStorage(count);
   }
 };
@@ -74,6 +81,7 @@ export const setAppBadge = async (count) => {
 export const incrementBadge = async () => {
   const currentCount = getBadgeCount();
   const newCount = currentCount + 1;
+  console.log(`[Badge] 📈 Incrementing badge: ${currentCount} → ${newCount}`);
   await setAppBadge(newCount);
   return newCount;
 };
@@ -87,22 +95,63 @@ export const clearAppBadge = async () => {
 
 /**
  * Initialize badge on app launch
- * - Clears badge if app is focused/visible
+ * - Clears badge if app is focused/visible AND count is 0
  * - Restores badge count if app was in background
  */
 export const initializeBadge = async () => {
+  const count = getBadgeCount();
+  console.log('[Badge] 🔄 Initializing badge, current count:', count);
+  
   // Check if app is visible/focused
   if (document.visibilityState === 'visible' || document.hasFocus()) {
-    // App is active, clear badge
-    await clearAppBadge();
-    console.log('[Badge] ✅ App launched/focused - badge cleared');
+    // Only clear if count is 0 (fresh start)
+    // Don't clear if badge was set while app was in background
+    if (count === 0) {
+      await clearAppBadge();
+      console.log('[Badge] ✅ App launched - badge cleared (count was 0)');
+    } else {
+      // Restore badge count
+      await setAppBadge(count);
+      console.log(`[Badge] ✅ App launched - badge restored to ${count}`);
+    }
   } else {
     // App might be in background, restore badge count
-    const count = getBadgeCount();
     if (count > 0) {
       await setAppBadge(count);
       console.log(`[Badge] ✅ App in background - badge restored to ${count}`);
     }
   }
 };
+
+/**
+ * Test badge functionality (for debugging)
+ * Expose to window for console testing
+ */
+export const testBadge = async () => {
+  console.log('🧪 Testing Badge API...');
+  console.log('Badge API supported:', isBadgeSupported());
+  console.log('Current count:', getBadgeCount());
+  
+  if (isBadgeSupported()) {
+    try {
+      await navigator.setAppBadge(99);
+      console.log('✅ Test: Badge set to 99 - check app icon!');
+      
+      setTimeout(async () => {
+        await navigator.clearAppBadge();
+        console.log('✅ Test: Badge cleared');
+      }, 3000);
+    } catch (error) {
+      console.error('❌ Test failed:', error);
+    }
+  } else {
+    console.log('⚠️ Badge API not supported - cannot test');
+  }
+};
+
+// Expose test function to window for console access
+if (typeof window !== 'undefined') {
+  window.testBadge = testBadge;
+  console.log('[Badge] 💡 Run testBadge() in console to test badge functionality');
+}
 

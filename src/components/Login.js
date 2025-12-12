@@ -33,8 +33,9 @@ export default function Login() {
           const exists = await checkEmailInFirestore(user.email);
           if (exists) {
             // User is authenticated and exists in Firestore, redirect to dashboard
+            // Use replace: true to prevent back button from going back to login
             console.log("✅ User already authenticated, redirecting to dashboard");
-            navigate("/dashboard");
+            navigate("/dashboard", { replace: true });
           } else {
             // User authenticated but not in Firestore, sign them out
             console.log("⚠️ User not in Firestore, signing out");

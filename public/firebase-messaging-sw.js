@@ -177,12 +177,13 @@ if (!messaging) {
       }
       
       // Build notification options - Make it popup/alert style with sound
+      // NOTE: 'sound' property is not standard and may be ignored by browsers
+      // We rely on 'silent: false' to trigger browser's default notification sound
       const notificationOptions = {
         body: notificationBody,
         icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
         badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
         image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
-        sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // Sound for beep
         data: {
           ...payload.data,
           // Ensure all data fields are preserved
@@ -197,7 +198,7 @@ if (!messaging) {
         tag: uniqueTag, // Unique tag to prevent duplicates
         requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
         vibrate: [200, 100, 200, 100, 200, 100, 200], // Longer vibration pattern for attention
-        silent: false, // CRITICAL: Must be false for sound beep to play
+        silent: false, // CRITICAL: Must be false for browser to play default notification sound
         renotify: false, // Set to false to prevent duplicate notifications
         timestamp: Date.now(),
         // Additional options for better mobile support and popup visibility
@@ -219,6 +220,8 @@ if (!messaging) {
       console.log("[SW] Notification title:", notificationTitle);
       console.log("[SW] Notification body:", notificationBody);
       console.log("[SW] Unique tag:", uniqueTag);
+      console.log("[SW] Silent:", notificationOptions.silent, "(false = sound enabled)");
+      console.log("[SW] Vibrate:", notificationOptions.vibrate);
       console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
 
       // CRITICAL: Always show notification when app is closed
@@ -263,9 +266,8 @@ if (!messaging) {
             badge: "/icons/icon.png",
             tag: uniqueTag,
             requireInteraction: true, // Keep as popup even in fallback
-            silent: false, // Ensure sound works
+            silent: false, // CRITICAL: Must be false for browser to play default notification sound
             vibrate: [200, 100, 200, 100, 200],
-            sound: "default",
             data: payload.data || {}
           });
         });
@@ -327,9 +329,8 @@ self.addEventListener("push", (event) => {
       icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
       badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
       image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
-      sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // Sound for beep
       vibrate: [200, 100, 200, 100, 200, 100, 200], // Longer vibration for attention
-      silent: false, // CRITICAL: Must be false for sound beep
+      silent: false, // CRITICAL: Must be false for browser to play default notification sound
       data: {
         ...payload.data,
         projectId: payload.data?.projectId || "",
