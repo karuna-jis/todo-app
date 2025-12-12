@@ -598,33 +598,33 @@ export default function Dashboard() {
       try {
         // Check if Badge API is supported
         const isSupported = 'setAppBadge' in navigator && 'clearAppBadge' in navigator;
-        console.log("[Dashboard] Badge API supported:", isSupported);
+        console.log("[Dashboard] 🔍 Badge API Check:");
+        console.log("[Dashboard]   - setAppBadge available:", 'setAppBadge' in navigator);
+        console.log("[Dashboard]   - clearAppBadge available:", 'clearAppBadge' in navigator);
+        console.log("[Dashboard]   - Badge API supported:", isSupported);
+        console.log("[Dashboard]   - User Agent:", navigator.userAgent);
+        console.log("[Dashboard]   - Platform:", navigator.platform);
         
         if (isSupported) {
-          // Only clear badge if app is visible AND this is the first load
-          // Don't clear on every focus - let badge persist until user interacts
-          const count = getBadgeCount();
-          console.log("[Dashboard] Current badge count from storage:", count);
-          
-          // If app is visible on first load, clear badge
-          // But don't clear if badge was just incremented
-          if (document.visibilityState === "visible" && count === 0) {
-            await clearAppBadge();
-            console.log("[Dashboard] ✅ Badge cleared on initial load (app visible)");
-          } else if (count > 0) {
-            // Restore badge count if it exists
-            await setAppBadge(count);
-            console.log(`[Dashboard] ✅ Badge restored to ${count}`);
-          }
+          // Use initializeBadge from utils which syncs with IndexedDB
+          const { initializeBadge } = await import("../utils/badge");
+          await initializeBadge();
+          console.log("[Dashboard] ✅ Badge initialized using initializeBadge()");
         } else {
           console.log("[Dashboard] ⚠️ Badge API not supported in this browser");
+          console.log("[Dashboard] ℹ️ Badge will not show on app icon");
+          console.log("[Dashboard] ℹ️ This is normal for some browsers/devices");
         }
       } catch (error) {
-        console.error("[Dashboard] Error initializing badge:", error);
+        console.error("[Dashboard] ❌ Error initializing badge:", error);
+        console.error("[Dashboard] Error details:", error.message);
       }
     };
 
-    initBadge();
+    // Small delay to ensure app is fully loaded
+    setTimeout(() => {
+      initBadge();
+    }, 500);
   }, []); // Only run once on mount
 
   // Clear badge only when user clicks notification (handled in NotificationPopup)
@@ -868,15 +868,24 @@ export default function Dashboard() {
 
     // Set badge to total unread count (not increment)
     if (totalUnreadCount > 0) {
-      setAppBadge(totalUnreadCount).catch((error) => {
-        console.error("[Dashboard] Error setting badge from unread count:", error);
-      });
-      console.log(`✅ Badge set to ${totalUnreadCount} (total unread notifications)`);
+      setAppBadge(totalUnreadCount)
+        .then(() => {
+          console.log(`✅ Badge set to ${totalUnreadCount} (total unread notifications)`);
+          console.log(`📱 Check app icon - badge should show ${totalUnreadCount}`);
+        })
+        .catch((error) => {
+          console.error("[Dashboard] ❌ Error setting badge from unread count:", error);
+          console.error("[Dashboard] Error details:", error.message);
+        });
     } else {
-      clearAppBadge().catch((error) => {
-        console.error("[Dashboard] Error clearing badge:", error);
-      });
-      console.log(`✅ Badge cleared (no unread notifications)`);
+      clearAppBadge()
+        .then(() => {
+          console.log(`✅ Badge cleared (no unread notifications)`);
+        })
+        .catch((error) => {
+          console.error("[Dashboard] ❌ Error clearing badge:", error);
+          console.error("[Dashboard] Error details:", error.message);
+        });
     }
   }, [projectNotificationCounts, userUID]);
 

@@ -48,13 +48,23 @@ export const setAppBadge = async (count) => {
   console.log(`[Badge] 🔧 Setting badge to ${count}...`);
   console.log(`[Badge] Badge API supported: ${isBadgeSupported()}`);
   console.log(`[Badge] Current localStorage count: ${getBadgeCount()}`);
+  console.log(`[Badge] User Agent: ${navigator.userAgent}`);
+  console.log(`[Badge] Platform: ${navigator.platform}`);
   
   if (isBadgeSupported()) {
     try {
       if (count > 0) {
         await navigator.setAppBadge(count);
         console.log(`[Badge] ✅ Badge set to ${count} (Badge API)`);
-        console.log(`[Badge] Check app icon - badge should show ${count}`);
+        console.log(`[Badge] 📱 Check app icon - badge should show ${count}`);
+        
+        // Verify badge was set
+        try {
+          const currentBadge = await navigator.getAppBadge();
+          console.log(`[Badge] ✅ Verified: Current badge count is ${currentBadge}`);
+        } catch (e) {
+          console.log(`[Badge] ⚠️ Could not verify badge (getAppBadge not supported)`);
+        }
       } else {
         await navigator.clearAppBadge();
         console.log('[Badge] ✅ Badge cleared (Badge API)');
@@ -64,12 +74,15 @@ export const setAppBadge = async (count) => {
     } catch (error) {
       console.error('[Badge] ❌ Error setting badge via Badge API:', error);
       console.error('[Badge] Error details:', error.message);
+      console.error('[Badge] Error stack:', error.stack);
       // Fallback to localStorage
       setBadgeCountStorage(count);
     }
   } else {
     // Fallback: store in localStorage
     console.log(`[Badge] ⚠️ Badge API not supported in this browser`);
+    console.log(`[Badge] ⚠️ setAppBadge available: ${'setAppBadge' in navigator}`);
+    console.log(`[Badge] ⚠️ clearAppBadge available: ${'clearAppBadge' in navigator}`);
     console.log(`[Badge] Storing count ${count} in localStorage (will show when Badge API is supported)`);
     setBadgeCountStorage(count);
   }
@@ -233,9 +246,22 @@ export const testBadge = async () => {
   }
 };
 
-// Expose test function to window for console access
+// Expose test function and badge utilities to window for console access
 if (typeof window !== 'undefined') {
   window.testBadge = testBadge;
-  console.log('[Badge] 💡 Run testBadge() in console to test badge functionality');
+  window.setAppBadge = setAppBadge;
+  window.clearAppBadge = clearAppBadge;
+  window.getBadgeCount = getBadgeCount;
+  window.isBadgeSupported = isBadgeSupported;
+  window.incrementBadge = incrementBadge;
+  
+  console.log('[Badge] 💡 Badge API utilities exposed to window:');
+  console.log('[Badge]   - testBadge() - Test badge functionality');
+  console.log('[Badge]   - setAppBadge(count) - Set badge count');
+  console.log('[Badge]   - clearAppBadge() - Clear badge');
+  console.log('[Badge]   - getBadgeCount() - Get current badge count');
+  console.log('[Badge]   - isBadgeSupported() - Check if Badge API is supported');
+  console.log('[Badge]   - incrementBadge() - Increment badge by 1');
+  console.log('[Badge] 📱 Example: testBadge() or setAppBadge(5)');
 }
 
