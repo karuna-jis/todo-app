@@ -22,14 +22,14 @@
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!-- Register Service Worker for PWA -->
+    <!-- Register Service Workers for PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Register Firebase Messaging Service Worker (includes offline support)
-          navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          // Register main PWA Service Worker first
+          navigator.serviceWorker.register('/serviceWorker.js', { scope: '/' })
             .then((registration) => {
-              console.log('✅ Service Worker registered:', registration.scope);
+              console.log('✅ PWA Service Worker registered:', registration.scope);
               
               // Check for updates
               registration.addEventListener('updatefound', () => {
@@ -38,17 +38,30 @@
                   newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                       console.log('🔄 New service worker available. Refresh to update.');
-                      // Optional: Show update notification to user
+                      // Dispatch event for React components to show update notification
+                      window.dispatchEvent(new CustomEvent('sw-update-available'));
                     } else if (newWorker.state === 'activated') {
                       console.log('✅ Service worker activated');
+                      // Reload page to use new service worker
+                      if (navigator.serviceWorker.controller) {
+                        window.location.reload();
+                      }
                     }
                   });
                 }
               });
+              
+              // Periodically check for updates
+              setInterval(() => {
+                registration.update();
+              }, 60000); // Check every minute
             })
             .catch((error) => {
-              console.error('❌ Service Worker registration failed:', error);
+              console.error('❌ PWA Service Worker registration failed:', error);
             });
+          
+          // Note: Firebase Messaging is now integrated into serviceWorker.js
+          // The firebase-messaging-sw.js is kept as a backup but serviceWorker.js is the primary
         });
       }
       

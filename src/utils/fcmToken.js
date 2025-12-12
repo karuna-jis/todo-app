@@ -216,8 +216,8 @@ const waitForServiceWorker = async () => {
     // Register service worker if not registered
     if (!navigator.serviceWorker.controller) {
       try {
-        console.log("   Registering service worker at /firebase-messaging-sw.js...");
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        console.log("   Registering service worker at /serviceWorker.js...");
+        const registration = await navigator.serviceWorker.register('/serviceWorker.js', {
           scope: '/'
         });
         console.log("   Service worker registered, scope:", registration.scope);
@@ -287,7 +287,7 @@ const waitForServiceWorker = async () => {
           console.error("   ❌ Service worker not ready after waiting");
           console.error("   Waited for", maxAttempts * 0.5, "seconds");
           console.error("   Possible issues:");
-          console.error("   1. firebase-messaging-sw.js not accessible");
+          console.error("   1. serviceWorker.js not accessible");
           console.error("   2. Browser blocking service worker");
           console.error("   3. Not running on HTTPS or localhost");
           console.error("   💡 Try refreshing the page");
@@ -322,7 +322,7 @@ export const initializeFCMToken = async (userUID) => {
       console.error("❌ Firebase Messaging not initialized");
       console.error("   Possible reasons:");
       console.error("   1. Browser doesn't support service workers");
-      console.error("   2. firebase-messaging-sw.js not in public folder");
+      console.error("   2. serviceWorker.js not in public folder");
       console.error("   3. Firebase config issue");
       return false;
     }
@@ -354,11 +354,11 @@ export const initializeFCMToken = async (userUID) => {
       console.error("❌ Service worker not ready after waiting");
       console.error("   This is REQUIRED for FCM token generation");
       console.error("   Possible reasons:");
-      console.error("   1. Service worker file not accessible at /firebase-messaging-sw.js");
+      console.error("   1. Service worker file not accessible at /serviceWorker.js");
       console.error("   2. Browser blocking service worker");
       console.error("   3. HTTPS required (or localhost)");
       console.error("   💡 Solution:");
-      console.error("   - Check if firebase-messaging-sw.js exists in public folder");
+      console.error("   - Check if serviceWorker.js exists in public folder");
       console.error("   - Check browser console for service worker errors");
       console.error("   - Try refreshing the page");
       console.error("   - Check if running on HTTPS or localhost");
