@@ -521,14 +521,13 @@ const addTask = async () => {
                 padding: 0, 
                 fontSize: "18px", 
                 flexShrink: 0, 
-                marginLeft: isMobile ? "0" : "-12px",
-                order: isMobile ? 2 : 1
+                marginLeft: isMobile ? "0" : "-12px"
               }}
               onClick={() => window.history.back()}
             >
               ←
             </button>
-            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ order: isMobile ? 1 : 2 }}>Chat Box</h1>
+            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px", textAlign: "center" }}>
             {projectName}
