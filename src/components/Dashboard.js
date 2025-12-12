@@ -591,45 +591,39 @@ export default function Dashboard() {
     };
   }, [showNotification]);
 
-  // Initialize badge on app launch (only once, not on every focus)
+  // Initialize badge on app launch and clear on focus/visibility
   useEffect(() => {
-    // Initialize badge on mount (only clears if app is already visible)
-    // Don't clear on every focus - only on initial load
-    const initBadge = async () => {
-      try {
-        // Check if Badge API is supported
-        const isSupported = 'setAppBadge' in navigator && 'clearAppBadge' in navigator;
-        console.log("[Dashboard] Badge API supported:", isSupported);
-        
-        if (isSupported) {
-          // Only clear badge if app is visible AND this is the first load
-          // Don't clear on every focus - let badge persist until user interacts
-          const count = getBadgeCount();
-          console.log("[Dashboard] Current badge count from storage:", count);
-          
-          // If app is visible on first load, clear badge
-          // But don't clear if badge was just incremented
-          if (document.visibilityState === "visible" && count === 0) {
-            await clearAppBadge();
-            console.log("[Dashboard] ✅ Badge cleared on initial load (app visible)");
-          } else if (count > 0) {
-            // Restore badge count if it exists
-            await setAppBadge(count);
-            console.log(`[Dashboard] ✅ Badge restored to ${count}`);
-          }
-        } else {
-          console.log("[Dashboard] ⚠️ Badge API not supported in this browser");
-        }
-      } catch (error) {
-        console.error("[Dashboard] Error initializing badge:", error);
+    // Initialize badge on mount
+    initializeBadge().catch((error) => {
+      console.error("[Dashboard] Error initializing badge:", error);
+    });
+
+    // Clear badge when app gains focus (user opens the app)
+    const handleFocus = () => {
+      console.log("[Dashboard] 📱 App focused - clearing badge");
+      clearAppBadge().catch((error) => {
+        console.error("[Dashboard] Error clearing badge on focus:", error);
+      });
+    };
+
+    // Clear badge when visibility changes to visible (user opens the app)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("[Dashboard] 📱 App became visible - clearing badge");
+        clearAppBadge().catch((error) => {
+          console.error("[Dashboard] Error clearing badge on visibility change:", error);
+        });
       }
     };
 
-    initBadge();
-  }, []); // Only run once on mount
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-  // Clear badge only when user clicks notification (handled in NotificationPopup)
-  // Don't clear on focus/visibility change - let badge persist
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
 
   // LOAD PROJECTS (realtime)

@@ -177,8 +177,7 @@ const syncBadgeCountFromIndexedDB = async () => {
 
 /**
  * Initialize badge on app launch
- * - Clears badge if app is focused/visible AND count is 0
- * - Restores badge count if app was in background
+ * - Clears badge when app opens/focuses (user is viewing the app)
  * - Syncs with IndexedDB (set by service worker when app is closed)
  */
 export const initializeBadge = async () => {
@@ -188,21 +187,17 @@ export const initializeBadge = async () => {
   
   // Check if app is visible/focused
   if (document.visibilityState === 'visible' || document.hasFocus()) {
-    // Only clear if count is 0 (fresh start)
-    // Don't clear if badge was set while app was in background
-    if (syncedCount === 0) {
-      await clearAppBadge();
-      console.log('[Badge] ✅ App launched - badge cleared (count was 0)');
-    } else {
-      // Restore badge count
-      await setAppBadge(syncedCount);
-      console.log(`[Badge] ✅ App launched - badge restored to ${syncedCount} (from IndexedDB/localStorage)`);
-    }
+    // App is open and visible - clear badge (user is viewing the app)
+    await clearAppBadge();
+    console.log('[Badge] ✅ App opened/focused - badge cleared');
   } else {
     // App might be in background, restore badge count
     if (syncedCount > 0) {
       await setAppBadge(syncedCount);
       console.log(`[Badge] ✅ App in background - badge restored to ${syncedCount}`);
+    } else {
+      await clearAppBadge();
+      console.log('[Badge] ✅ App in background - badge cleared (count was 0)');
     }
   }
 };
