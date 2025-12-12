@@ -693,7 +693,8 @@ const addTask = async () => {
                 width: "auto !important",
                 flex: "0 0 auto !important",
                 overflow: "visible !important",
-                flexShrink: 0,
+                flexShrink: "0 !important",
+                position: "relative !important",
                 // Mobile specific
                 "@media (max-width: 992px)": {
                   display: "flex !important",
@@ -702,18 +703,44 @@ const addTask = async () => {
                   minWidth: "100px !important",
                   maxWidth: "140px !important",
                   width: "auto !important",
-                  flex: "0 0 auto !important"
+                  flex: "0 0 auto !important",
+                  flexShrink: "0 !important",
+                  overflow: "visible !important",
+                  position: "relative !important"
+                },
+                // Extra small mobile devices
+                "@media (max-width: 600px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "90px !important",
+                  maxWidth: "130px !important"
                 }
               },
               "& .MuiTimelineItem-root": {
                 "& .MuiTimelineOppositeContent-root": {
                   display: "flex !important",
                   visibility: "visible !important",
+                  opacity: "1 !important",
                   minWidth: { xs: "100px !important", sm: "120px !important" },
+                  flex: "0 0 auto !important",
+                  flexShrink: "0 !important",
+                  overflow: "visible !important",
+                  position: "relative !important",
                   "@media (max-width: 992px)": {
                     display: "flex !important",
                     visibility: "visible !important",
-                    minWidth: "100px !important"
+                    opacity: "1 !important",
+                    minWidth: "100px !important",
+                    flex: "0 0 auto !important",
+                    flexShrink: "0 !important",
+                    overflow: "visible !important"
+                  },
+                  "@media (max-width: 600px)": {
+                    display: "flex !important",
+                    visibility: "visible !important",
+                    opacity: "1 !important",
+                    minWidth: "90px !important"
                   }
                 }
               }
@@ -751,7 +778,8 @@ const addTask = async () => {
                 width: "auto !important",
                 flex: "0 0 auto !important",
                 overflow: "visible !important",
-                flexShrink: 0,
+                flexShrink: "0 !important",
+                position: "relative !important",
                 // Mobile specific
                 "@media (max-width: 992px)": {
                   display: "flex !important",
@@ -759,17 +787,43 @@ const addTask = async () => {
                   opacity: "1 !important",
                   minWidth: "100px !important",
                   maxWidth: "140px !important",
-                  width: "auto !important"
+                  width: "auto !important",
+                  flex: "0 0 auto !important",
+                  flexShrink: "0 !important",
+                  overflow: "visible !important",
+                  position: "relative !important"
+                },
+                // Extra small mobile devices
+                "@media (max-width: 600px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "90px !important",
+                  maxWidth: "130px !important"
                 }
               },
               "& .MuiTimelineItem-oppositeContent": {
                 display: "flex !important",
                 visibility: "visible !important",
                 minWidth: { xs: "100px !important", sm: "120px !important" },
+                flex: "0 0 auto !important",
+                flexShrink: "0 !important",
+                overflow: "visible !important",
+                position: "relative !important",
                 "@media (max-width: 992px)": {
                   display: "flex !important",
                   visibility: "visible !important",
-                  minWidth: "100px !important"
+                  opacity: "1 !important",
+                  minWidth: "100px !important",
+                  flex: "0 0 auto !important",
+                  flexShrink: "0 !important",
+                  overflow: "visible !important"
+                },
+                "@media (max-width: 600px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "90px !important"
                 }
               }
             }}
@@ -781,19 +835,21 @@ const addTask = async () => {
               sx={{ 
                 m: "auto 0", 
                 fontWeight: 600,
-                minWidth: { xs: "100px", sm: "120px" },
-                maxWidth: { xs: "140px", sm: "180px" },
+                minWidth: { xs: "100px !important", sm: "120px !important" },
+                maxWidth: { xs: "140px !important", sm: "180px !important" },
                 width: "auto !important",
-                paddingRight: { xs: "8px", sm: "16px" },
-                paddingLeft: { xs: "8px", sm: "12px" },
+                paddingRight: { xs: "8px !important", sm: "16px !important" },
+                paddingLeft: { xs: "8px !important", sm: "12px !important" },
                 display: "flex !important",
                 visibility: "visible !important",
                 opacity: "1 !important",
-                fontSize: { xs: "11px", sm: "12px" },
+                fontSize: { xs: "11px !important", sm: "12px !important" },
                 flex: "0 0 auto !important",
-                flexShrink: 0,
+                flexShrink: "0 !important",
                 overflow: "visible !important",
-                textAlign: "right",
+                textAlign: "right !important",
+                position: "relative !important",
+                zIndex: 1,
                 // Mobile specific - ensure it's always visible
                 "@media (max-width: 992px)": {
                   display: "flex !important",
@@ -801,7 +857,23 @@ const addTask = async () => {
                   opacity: "1 !important",
                   minWidth: "100px !important",
                   maxWidth: "140px !important",
-                  width: "auto !important"
+                  width: "auto !important",
+                  flex: "0 0 auto !important",
+                  flexShrink: "0 !important",
+                  overflow: "visible !important",
+                  position: "relative !important",
+                  marginRight: "8px !important"
+                },
+                // Extra small mobile devices
+                "@media (max-width: 600px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "90px !important",
+                  maxWidth: "130px !important",
+                  fontSize: "10px !important",
+                  paddingRight: "4px !important",
+                  paddingLeft: "4px !important"
                 }
               }}
               color="text.secondary"
