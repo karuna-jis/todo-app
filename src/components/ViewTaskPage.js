@@ -512,25 +512,23 @@ const addTask = async () => {
       >
         <div className="flex-grow-1" style={{ minWidth: "120px", display: "flex", flexDirection: "column" }}>
           <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: isMobile ? "center" : "flex-start" }}>
-            {!isMobile && (
-              <button
-                className="btn btn-light back-btn-responsive"
-                style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0, marginLeft: "-12px" }}
-                onClick={() => window.history.back()}
-              >
-                ←
-              </button>
-            )}
-            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
-            {isMobile && (
-              <button
-                className="btn btn-light back-btn-responsive"
-                style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0 }}
-                onClick={() => window.history.back()}
-              >
-                ←
-              </button>
-            )}
+            <button
+              className="btn btn-light back-btn-responsive"
+              style={{ 
+                borderRadius: "50%", 
+                width: "35px", 
+                height: "35px", 
+                padding: 0, 
+                fontSize: "18px", 
+                flexShrink: 0, 
+                marginLeft: isMobile ? "0" : "-12px",
+                order: isMobile ? 2 : 1
+              }}
+              onClick={() => window.history.back()}
+            >
+              ←
+            </button>
+            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ order: isMobile ? 1 : 2 }}>Chat Box</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px", textAlign: "center" }}>
             {projectName}
