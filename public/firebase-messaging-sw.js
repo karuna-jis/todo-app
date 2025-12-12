@@ -377,13 +377,19 @@ if (!messaging) {
         console.log("[SW] Could not check existing notifications:", error);
       }
       
+      // Get current badge count from IndexedDB
+      const currentBadgeCount = await getBadgeCountFromDB();
+      const newBadgeCount = currentBadgeCount + 1;
+      
       // Build notification options - Make it popup/alert style with sound
       // NOTE: 'sound' property is not standard and may be ignored by browsers
       // We rely on 'silent: false' to trigger browser's default notification sound
+      // NOTE: Android badge count is set in FCM payload's android.notification.notificationCount
+      // (configured in server.js) - not in service worker notification options
       const notificationOptions = {
         body: notificationBody,
         icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
-        badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+        badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png", // Badge icon image
         image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
         data: {
           ...payload.data,
@@ -399,7 +405,9 @@ if (!messaging) {
           link: payload.fcmOptions?.link || payload.data?.link || "",
           // Store formatted notification details
           notificationTitle: notificationTitle,
-          notificationBody: notificationBody
+          notificationBody: notificationBody,
+          // Android badge count in data (for reference)
+          badgeCount: String(newBadgeCount)
         },
         tag: uniqueTag, // Unique tag to prevent duplicates
         requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
@@ -564,10 +572,14 @@ self.addEventListener("push", (event) => {
       console.log("[SW] Could not check existing notifications:", error);
     }
     
+    // Get current badge count from IndexedDB
+    const currentBadgeCount = await getBadgeCountFromDB();
+    const newBadgeCount = currentBadgeCount + 1;
+    
     const notificationOptions = {
       body: notificationBody,
       icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
-      badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+      badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png", // Badge icon image
       image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
       vibrate: [200, 100, 200, 100, 200, 100, 200], // Longer vibration for attention
       silent: false, // CRITICAL: Must be false for browser to play default notification sound
@@ -585,7 +597,9 @@ self.addEventListener("push", (event) => {
         link: payload.fcmOptions?.link || payload.data?.link || "",
         // Store formatted notification details
         notificationTitle: notificationTitle,
-        notificationBody: notificationBody
+        notificationBody: notificationBody,
+        // Badge count in data (for reference)
+        badgeCount: String(newBadgeCount)
       },
       tag: uniqueTag, // Unique tag to prevent duplicates
       requireInteraction: true, // CRITICAL: Keep notification visible (popup style)
