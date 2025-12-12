@@ -677,8 +677,8 @@ const addTask = async () => {
           paddingBottom: isMobile ? "70px" : "90px" // Add padding to prevent content from being hidden behind input bar
         }}
       >
-        <div className="timeline-container-responsive" style={{ paddingLeft: 0, paddingRight: 0 }}>
-          <Timeline position="right" className="task-timeline-responsive">   {/* force items to the right */}
+        <div className="timeline-container-responsive" style={{ paddingLeft: "12px", paddingRight: "12px" }}>
+          <Timeline position="right" className="task-timeline-responsive" sx={{ paddingLeft: 0, paddingRight: 0 }}>   {/* force items to the right */}
     {tasks.length === 0 ? (
       <div style={{ padding: "24px 12px" }}>
         <p className="text-center text-muted mt-4">
@@ -700,12 +700,31 @@ const addTask = async () => {
           <TimelineItem 
             key={t.id} 
             className="task-item-responsive"
+            sx={{ 
+              "& .MuiTimelineOppositeContent-root": {
+                display: "block !important",
+                visibility: "visible !important",
+                opacity: "1 !important",
+                minWidth: "120px",
+                maxWidth: "150px"
+              }
+            }}
           >
 
             {/* LEFT SIDE — ONLY DATE */}
             <TimelineOppositeContent
               align="right"
-              sx={{ m: "auto 0", fontWeight: 600 }}
+              sx={{ 
+                m: "auto 0", 
+                fontWeight: 600,
+                minWidth: "120px",
+                maxWidth: "150px",
+                paddingRight: "16px",
+                display: "block",
+                visibility: "visible",
+                opacity: 1,
+                fontSize: "12px"
+              }}
               color="text.secondary"
               className="timeline-date-responsive"
             >
