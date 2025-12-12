@@ -511,7 +511,7 @@ const addTask = async () => {
         style={{ backgroundColor: "#2a8c7b", gap: "10px", position: "sticky", top: 0, zIndex: 100, paddingLeft: "12px", paddingRight: "12px", marginLeft: 0, marginRight: 0 }}
       >
         <div className="flex-grow-1" style={{ minWidth: "120px", display: "flex", flexDirection: "column" }}>
-          <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: isMobile ? "flex-start" : "flex-start" }}>
+          <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: "flex-start" }}>
             <button
               className="btn btn-light back-btn-responsive"
               style={{ 
@@ -520,13 +520,14 @@ const addTask = async () => {
                 height: "35px", 
                 padding: 0, 
                 fontSize: "18px", 
-                flexShrink: 0
+                flexShrink: 0,
+                order: 1
               }}
               onClick={() => window.history.back()}
             >
               ←
             </button>
-            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
+            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ order: 2 }}>Chat Box</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px" }}>
             {projectName}
