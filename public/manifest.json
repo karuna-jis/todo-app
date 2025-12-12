@@ -59,6 +59,7 @@
   "theme_color": "#2a8c7b",
   "background_color": "#ffffff",
   "categories": ["productivity", "business"],
+  "badge": "/icons/icon.png",
   "shortcuts": [
     {
       "name": "Dashboard",

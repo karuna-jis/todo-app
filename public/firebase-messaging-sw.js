@@ -442,15 +442,31 @@ if (!messaging) {
       console.log("[SW]   Vibrate:", notificationOptions.vibrate);
       console.log("[SW] Full notification options:", JSON.stringify(notificationOptions, null, 2));
 
+      // Update badge count in IndexedDB before showing notification
+      await setBadgeCountInDB(newBadgeCount);
+      console.log(`[SW] 📱 Badge count updated in IndexedDB: ${newBadgeCount}`);
+
       // CRITICAL: Always show notification when app is closed
       // Show notification with popup style and sound
       return self.registration.showNotification(notificationTitle, notificationOptions)
         .then(async () => {
           console.log("[SW] ✅ Background notification shown successfully with popup style and sound!");
           
-          // Increment badge count in IndexedDB (for when app is closed)
-          const newBadgeCount = await incrementBadgeCountInDB();
-          console.log(`[SW] 📱 Badge count updated in IndexedDB: ${newBadgeCount} (app icon will show this when app opens)`);
+          // Try to set badge using Badge API (if supported in service worker)
+          // Note: Android Chrome may not support Badge API in service worker
+          // Badge count is also set via FCM payload's android.notification.notificationCount
+          try {
+            if ('setAppBadge' in self.navigator) {
+              await self.navigator.setAppBadge(newBadgeCount);
+              console.log(`[SW] ✅ Badge set to ${newBadgeCount} using Badge API`);
+            } else {
+              console.log("[SW] ⚠️ Badge API not available in service worker (Android Chrome limitation)");
+              console.log("[SW] ℹ️ Badge count will be shown via FCM payload's android.notification.notificationCount");
+            }
+          } catch (error) {
+            console.log("[SW] ⚠️ Could not set badge in service worker:", error);
+            console.log("[SW] ℹ️ Badge count will be shown via FCM payload's android.notification.notificationCount");
+          }
           
           // Send message to all open clients to increment badge (for when app is open)
           return self.clients.matchAll({ type: "window", includeUncontrolled: true })
@@ -477,6 +493,7 @@ if (!messaging) {
                 });
               } else {
                 console.log("[SW] ℹ️ No open clients - badge count stored in IndexedDB for when app opens");
+                console.log("[SW] ℹ️ Android badge will show via FCM payload's android.notification.notificationCount");
               }
             });
         })
