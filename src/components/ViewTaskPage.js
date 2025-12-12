@@ -826,6 +826,7 @@ const addTask = async () => {
                   minWidth: "90px !important"
                 }
               }
+              
             }}
           >
 
@@ -874,7 +875,9 @@ const addTask = async () => {
                   fontSize: "10px !important",
                   paddingRight: "4px !important",
                   paddingLeft: "4px !important",
-                  marginRight: "8px !important"
+
+                  
+                  
                 }
               }}
               color="text.secondary"
