@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 // Removed getFunctions - using Node.js backend instead of Cloud Functions
@@ -21,8 +21,19 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth=getAuth();
-export const db=getFirestore(app);
+export const auth = getAuth();
+
+// Set auth persistence to LOCAL (survives page refresh, browser close, navigation)
+// This ensures users stay logged in across sessions
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("✅ Auth persistence set to LOCAL - users will stay logged in");
+  })
+  .catch((error) => {
+    console.error("❌ Error setting auth persistence:", error);
+  });
+
+export const db = getFirestore(app);
 // ⭐ Secondary app for admin-created users (prevents logout)
 export const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 export const secondaryAuth = getAuth(secondaryApp);
