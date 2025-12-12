@@ -678,7 +678,47 @@ const addTask = async () => {
         }}
       >
         <div className="timeline-container-responsive" style={{ paddingLeft: "12px", paddingRight: "12px" }}>
-          <Timeline position="right" className="task-timeline-responsive" sx={{ paddingLeft: 0, paddingRight: 0 }}>   {/* force items to the right */}
+          <Timeline 
+            position="right" 
+            className="task-timeline-responsive" 
+            sx={{ 
+              paddingLeft: 0, 
+              paddingRight: 0,
+              "& .MuiTimelineOppositeContent-root": {
+                display: "flex !important",
+                visibility: "visible !important",
+                opacity: "1 !important",
+                minWidth: { xs: "100px !important", sm: "120px !important" },
+                maxWidth: { xs: "140px !important", sm: "180px !important" },
+                width: "auto !important",
+                flex: "0 0 auto !important",
+                overflow: "visible !important",
+                flexShrink: 0,
+                // Mobile specific
+                "@media (max-width: 992px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "100px !important",
+                  maxWidth: "140px !important",
+                  width: "auto !important",
+                  flex: "0 0 auto !important"
+                }
+              },
+              "& .MuiTimelineItem-root": {
+                "& .MuiTimelineOppositeContent-root": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  minWidth: { xs: "100px !important", sm: "120px !important" },
+                  "@media (max-width: 992px)": {
+                    display: "flex !important",
+                    visibility: "visible !important",
+                    minWidth: "100px !important"
+                  }
+                }
+              }
+            }}
+          >
     {tasks.length === 0 ? (
       <div style={{ padding: "24px 12px" }}>
         <p className="text-center text-muted mt-4">
@@ -701,12 +741,36 @@ const addTask = async () => {
             key={t.id} 
             className="task-item-responsive"
             sx={{ 
+              width: "100%",
               "& .MuiTimelineOppositeContent-root": {
-                display: "block !important",
+                display: "flex !important",
                 visibility: "visible !important",
                 opacity: "1 !important",
-                minWidth: "120px",
-                maxWidth: "150px"
+                minWidth: { xs: "100px !important", sm: "120px !important" },
+                maxWidth: { xs: "140px !important", sm: "180px !important" },
+                width: "auto !important",
+                flex: "0 0 auto !important",
+                overflow: "visible !important",
+                flexShrink: 0,
+                // Mobile specific
+                "@media (max-width: 992px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "100px !important",
+                  maxWidth: "140px !important",
+                  width: "auto !important"
+                }
+              },
+              "& .MuiTimelineItem-oppositeContent": {
+                display: "flex !important",
+                visibility: "visible !important",
+                minWidth: { xs: "100px !important", sm: "120px !important" },
+                "@media (max-width: 992px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  minWidth: "100px !important"
+                }
               }
             }}
           >
@@ -717,13 +781,28 @@ const addTask = async () => {
               sx={{ 
                 m: "auto 0", 
                 fontWeight: 600,
-                minWidth: "120px",
-                maxWidth: "150px",
-                paddingRight: "16px",
-                display: "block",
-                visibility: "visible",
-                opacity: 1,
-                fontSize: "12px"
+                minWidth: { xs: "100px", sm: "120px" },
+                maxWidth: { xs: "140px", sm: "180px" },
+                width: "auto !important",
+                paddingRight: { xs: "8px", sm: "16px" },
+                paddingLeft: { xs: "8px", sm: "12px" },
+                display: "flex !important",
+                visibility: "visible !important",
+                opacity: "1 !important",
+                fontSize: { xs: "11px", sm: "12px" },
+                flex: "0 0 auto !important",
+                flexShrink: 0,
+                overflow: "visible !important",
+                textAlign: "right",
+                // Mobile specific - ensure it's always visible
+                "@media (max-width: 992px)": {
+                  display: "flex !important",
+                  visibility: "visible !important",
+                  opacity: "1 !important",
+                  minWidth: "100px !important",
+                  maxWidth: "140px !important",
+                  width: "auto !important"
+                }
               }}
               color="text.secondary"
               className="timeline-date-responsive"
