@@ -153,69 +153,99 @@ if (!messaging) {
     const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Created";
     const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
     
-    // Build notification options - Make it popup/alert style
-    const notificationOptions = {
-      body: notificationBody,
-      icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
-      badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
-      image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
-      sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
-      data: {
-        ...payload.data,
-        // Ensure all data fields are preserved
-        projectId: payload.data?.projectId || "",
-        projectName: payload.data?.projectName || "",
-        taskId: payload.data?.taskId || "",
-        taskName: payload.data?.taskName || "",
-        addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
-        addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
-        link: payload.fcmOptions?.link || payload.data?.link || ""
-      },
-      tag: payload.data?.taskId || `task-${Date.now()}`, // Unique tag to prevent duplicates
-      requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
-      vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern for attention
-      silent: false, // CRITICAL: Must be false for sound to play
-      renotify: true,
-      timestamp: Date.now(),
-      // Additional options for better mobile support and popup visibility
-      dir: "ltr",
-      lang: "en",
-      // Make notification more prominent (popup style)
-      actions: [
-        {
-          action: "view",
-          title: "View Task"
-        },
-        {
-          action: "dismiss",
-          title: "Dismiss"
+    // Create unique tag to prevent duplicates - combine taskId, projectId, and timestamp
+    const taskId = payload.data?.taskId || "";
+    const projectId = payload.data?.projectId || "";
+    const uniqueTag = taskId && projectId 
+      ? `task-${projectId}-${taskId}` 
+      : `task-${projectId || 'unknown'}-${Date.now()}`;
+    
+    // Check for existing notifications with same tag to prevent duplicates
+    const checkAndShowNotification = async () => {
+      try {
+        const notifications = await self.registration.getNotifications({ tag: uniqueTag });
+        
+        // If notification with same tag exists, close it first to avoid duplicates
+        if (notifications.length > 0) {
+          console.log("[SW] ⚠️ Duplicate notification detected with tag:", uniqueTag);
+          notifications.forEach(notif => notif.close());
+          // Small delay to ensure old notification is closed
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-      ]
+      } catch (error) {
+        console.log("[SW] Could not check existing notifications:", error);
+      }
+      
+      // Build notification options - Make it popup/alert style with sound
+      const notificationOptions = {
+        body: notificationBody,
+        icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
+        badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+        image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
+        sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // Sound for beep
+        data: {
+          ...payload.data,
+          // Ensure all data fields are preserved
+          projectId: payload.data?.projectId || "",
+          projectName: payload.data?.projectName || "",
+          taskId: payload.data?.taskId || "",
+          taskName: payload.data?.taskName || "",
+          addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+          addedByName: payload.data?.addedByName || payload.data?.createdByName || "",
+          link: payload.fcmOptions?.link || payload.data?.link || ""
+        },
+        tag: uniqueTag, // Unique tag to prevent duplicates
+        requireInteraction: true, // CRITICAL: Keep notification visible until user interacts (popup style)
+        vibrate: [200, 100, 200, 100, 200, 100, 200], // Longer vibration pattern for attention
+        silent: false, // CRITICAL: Must be false for sound beep to play
+        renotify: false, // Set to false to prevent duplicate notifications
+        timestamp: Date.now(),
+        // Additional options for better mobile support and popup visibility
+        dir: "ltr",
+        lang: "en",
+        // Make notification more prominent (popup style)
+        actions: [
+          {
+            action: "view",
+            title: "View Task"
+          },
+          {
+            action: "dismiss",
+            title: "Dismiss"
+          }
+        ]
+      };
+
+      console.log("[SW] Notification title:", notificationTitle);
+      console.log("[SW] Notification body:", notificationBody);
+      console.log("[SW] Unique tag:", uniqueTag);
+      console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+
+      // CRITICAL: Always show notification when app is closed
+      // Show notification with popup style and sound
+      return self.registration.showNotification(notificationTitle, notificationOptions)
+        .then(() => {
+          console.log("[SW] ✅ Background notification shown successfully with popup style and sound!");
+        })
+        .catch((error) => {
+          console.error("[SW] ❌ Error showing background notification:", error);
+          // Try again with minimal options if first attempt fails (still popup style with sound)
+          return self.registration.showNotification(notificationTitle, {
+            body: notificationBody,
+            icon: "/icons/icon.png",
+            badge: "/icons/icon.png",
+            tag: uniqueTag,
+            requireInteraction: true, // Keep as popup even in fallback
+            silent: false, // Ensure sound works
+            vibrate: [200, 100, 200, 100, 200],
+            sound: "default",
+            data: payload.data || {}
+          });
+        });
     };
 
-    console.log("[SW] Notification title:", notificationTitle);
-    console.log("[SW] Notification body:", notificationBody);
-    console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
-
-    // CRITICAL: Always show notification when app is closed
     // Use waitUntil to ensure notification is shown even if service worker is busy
-    return self.registration.showNotification(notificationTitle, notificationOptions)
-      .then(() => {
-        console.log("[SW] ✅ Background notification shown successfully!");
-      })
-      .catch((error) => {
-        console.error("[SW] ❌ Error showing background notification:", error);
-        // Try again with minimal options if first attempt fails (still popup style)
-        return self.registration.showNotification(notificationTitle, {
-          body: notificationBody,
-          icon: "/icons/icon.png",
-          badge: "/icons/icon.png",
-          requireInteraction: true, // Keep as popup even in fallback
-          silent: false,
-          vibrate: [200, 100, 200],
-          data: payload.data || {}
-        });
-      });
+    return checkAndShowNotification();
   });
   
   console.log("[SW] ✅ onBackgroundMessage handler registered successfully");
@@ -242,51 +272,76 @@ self.addEventListener("push", (event) => {
   const notificationTitle = payload.notification?.title || payload.data?.title || "New Task Added";
   const notificationBody = payload.notification?.body || payload.data?.body || "A new task was added";
   
-  const notificationOptions = {
-    body: notificationBody,
-    icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
-    badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
-    image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
-    sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default",
-    vibrate: [200, 100, 200, 100, 200], // Longer vibration for attention
-    silent: false, // CRITICAL: Must be false for sound
-    data: {
-      ...payload.data,
-      projectId: payload.data?.projectId || "",
-      projectName: payload.data?.projectName || "",
-      taskId: payload.data?.taskId || "",
-      taskName: payload.data?.taskName || "",
-      link: payload.fcmOptions?.link || payload.data?.link || ""
-    },
-    tag: payload.data?.taskId || `task-${Date.now()}`,
-    requireInteraction: true, // CRITICAL: Keep notification visible (popup style)
-    renotify: true,
-    timestamp: Date.now(),
-    // Popup-style actions
-    actions: [
-      {
-        action: "view",
-        title: "View Task"
-      },
-      {
-        action: "dismiss",
-        title: "Dismiss"
+  // Create unique tag to prevent duplicates
+  const taskId = payload.data?.taskId || "";
+  const projectId = payload.data?.projectId || "";
+  const uniqueTag = taskId && projectId 
+    ? `task-${projectId}-${taskId}` 
+    : `task-${projectId || 'unknown'}-${Date.now()}`;
+  
+  // Check and show notification with duplicate prevention
+  const checkAndShowNotification = async () => {
+    try {
+      const notifications = await self.registration.getNotifications({ tag: uniqueTag });
+      
+      // If notification with same tag exists, close it first to avoid duplicates
+      if (notifications.length > 0) {
+        console.log("[SW] ⚠️ Duplicate notification detected with tag:", uniqueTag);
+        notifications.forEach(notif => notif.close());
+        // Small delay to ensure old notification is closed
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    ]
-  };
+    } catch (error) {
+      console.log("[SW] Could not check existing notifications:", error);
+    }
+    
+    const notificationOptions = {
+      body: notificationBody,
+      icon: payload.notification?.icon || payload.webpush?.notification?.icon || "/icons/icon.png",
+      badge: payload.notification?.badge || payload.webpush?.notification?.badge || "/icons/icon.png",
+      image: payload.notification?.image || payload.data?.image || "/icons/icon.png", // Large image for popup
+      sound: payload.notification?.sound || payload.webpush?.notification?.sound || "default", // Sound for beep
+      vibrate: [200, 100, 200, 100, 200, 100, 200], // Longer vibration for attention
+      silent: false, // CRITICAL: Must be false for sound beep
+      data: {
+        ...payload.data,
+        projectId: payload.data?.projectId || "",
+        projectName: payload.data?.projectName || "",
+        taskId: payload.data?.taskId || "",
+        taskName: payload.data?.taskName || "",
+        link: payload.fcmOptions?.link || payload.data?.link || ""
+      },
+      tag: uniqueTag, // Unique tag to prevent duplicates
+      requireInteraction: true, // CRITICAL: Keep notification visible (popup style)
+      renotify: false, // Set to false to prevent duplicate notifications
+      timestamp: Date.now(),
+      // Popup-style actions
+      actions: [
+        {
+          action: "view",
+          title: "View Task"
+        },
+        {
+          action: "dismiss",
+          title: "Dismiss"
+        }
+      ]
+    };
 
-  console.log("[SW] Showing push notification:", notificationTitle);
-  console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
+    console.log("[SW] Showing push notification:", notificationTitle);
+    console.log("[SW] Unique tag:", uniqueTag);
+    console.log("[SW] Notification options:", JSON.stringify(notificationOptions, null, 2));
 
-  event.waitUntil(
-    self.registration.showNotification(notificationTitle, notificationOptions)
+    return self.registration.showNotification(notificationTitle, notificationOptions)
       .then(() => {
-        console.log("[SW] ✅ Push notification shown successfully!");
+        console.log("[SW] ✅ Push notification shown successfully with popup style and sound!");
       })
       .catch((error) => {
         console.error("[SW] ❌ Error showing push notification:", error);
-      })
-  );
+      });
+  };
+
+  event.waitUntil(checkAndShowNotification());
 });
 
 // Handle notification click and action buttons
