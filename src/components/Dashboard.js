@@ -552,10 +552,9 @@ export default function Dashboard() {
       console.log("[Dashboard] 📨 Message from service worker:", event.data);
 
       if (event.data?.type === "INC_BADGE") {
-        // Increment badge when background notification arrives
-        incrementBadge().catch((error) => {
-          console.error("[Dashboard] Error incrementing badge from SW message:", error);
-        });
+        // Don't increment badge here - badge count is calculated from unread notifications
+        // The notification count listener will update badge automatically
+        console.log("[Dashboard] Background notification received - badge will update from unread count");
 
         // Also show notification popup if app is open
         if (event.data.payload) {
@@ -763,11 +762,10 @@ export default function Dashboard() {
                 timestamp: taskData.createdAt?.toMillis?.() || Date.now(),
               });
 
-              // Increment badge count when new task is detected via Firestore listener
-              // This ensures badge shows immediately when task is added
-              incrementBadge().catch((error) => {
-                console.error("[Dashboard] Error incrementing badge on new task:", error);
-              });
+              // Don't increment badge here - badge count will be updated by notification count listener
+              // Badge count is calculated from unread notifications (seenBy array)
+              // This ensures badge shows actual unread count, not just increment
+              console.log("[Dashboard] New task detected - badge count will update from unread notifications");
             }
           }
         },
@@ -817,7 +815,7 @@ export default function Dashboard() {
 
       const unsub = onSnapshot(
         q,
-        (snap) => {
+        async (snap) => {
           // Filter notifications where seenBy does NOT include current user UID
           // Recalculate badges only from unseen notifications
           const unseenNotifications = snap.docs.filter((docSnap) => {
@@ -828,6 +826,9 @@ export default function Dashboard() {
           
           const count = unseenNotifications.length;
           console.log(`📊 Project ${project.name}: ${count} unseen notifications`);
+          
+          // Update project notification count
+          // Badge will be updated by separate useEffect that watches projectNotificationCounts
           setProjectNotificationCounts((prev) => ({
             ...prev,
             [project.id]: count,
@@ -845,6 +846,39 @@ export default function Dashboard() {
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [userUID, projects]);
+
+  // Update app icon badge based on total unread notifications across all projects
+  useEffect(() => {
+    if (!userUID || Object.keys(projectNotificationCounts).length === 0) {
+      // If no projects or no counts, clear badge
+      clearAppBadge().catch((error) => {
+        console.error("[Dashboard] Error clearing badge:", error);
+      });
+      return;
+    }
+
+    // Calculate total unread count across all projects
+    const totalUnreadCount = Object.values(projectNotificationCounts).reduce(
+      (sum, count) => sum + (count || 0),
+      0
+    );
+
+    console.log(`📱 Total unread notifications across all projects: ${totalUnreadCount}`);
+    console.log(`📊 Project notification counts:`, projectNotificationCounts);
+
+    // Set badge to total unread count (not increment)
+    if (totalUnreadCount > 0) {
+      setAppBadge(totalUnreadCount).catch((error) => {
+        console.error("[Dashboard] Error setting badge from unread count:", error);
+      });
+      console.log(`✅ Badge set to ${totalUnreadCount} (total unread notifications)`);
+    } else {
+      clearAppBadge().catch((error) => {
+        console.error("[Dashboard] Error clearing badge:", error);
+      });
+      console.log(`✅ Badge cleared (no unread notifications)`);
+    }
+  }, [projectNotificationCounts, userUID]);
 
   // LOAD ALL TASKS FOR ADMIN (realtime) - Show all tasks from all projects
   useEffect(() => {

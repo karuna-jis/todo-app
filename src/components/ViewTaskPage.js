@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { auth, db } from "./firebase.js";
+import { clearAppBadge } from "../utils/badge";
 
 import {
   collection,
@@ -60,6 +61,30 @@ const tasksColPath = projectId
   ? collection(db, "projects", projectId, "tasks")
   : null;
 
+  // Clear badge when ViewTaskPage is opened (user is viewing tasks)
+  useEffect(() => {
+    if (!projectId) return;
+
+    const clearBadgeOnView = async () => {
+      try {
+        // Clear badge immediately when ViewTaskPage opens
+        await clearAppBadge();
+        console.log("✅ Badge cleared - user opened ViewTaskPage to view tasks");
+        
+        // Also clear after a small delay to ensure it stays cleared
+        setTimeout(async () => {
+          await clearAppBadge();
+          console.log("✅ Badge cleared again (ensuring it stays cleared)");
+        }, 500);
+      } catch (error) {
+        console.error("Error clearing badge on ViewTaskPage open:", error);
+      }
+    };
+
+    // Clear badge immediately when page loads
+    clearBadgeOnView();
+  }, [projectId]);
+
   // Mark notifications as seen when user opens chat page (ViewTaskPage)
   // markSeen() should be called ONLY inside TaskViewPage useEffect
   useEffect(() => {
@@ -111,6 +136,23 @@ const tasksColPath = projectId
           console.log(`Successfully updated ${updatePromises.length} notifications`);
         } else {
           console.log("No notifications to update");
+        }
+        
+        // Always clear badge when user views tasks (notifications will be marked as seen)
+        // Badge will be recalculated by notification count listener based on unread count
+        // Since notifications are now marked as seen, unread count will be 0, so badge will stay cleared
+        try {
+          await clearAppBadge();
+          console.log("✅ Badge cleared - user viewed tasks in this project");
+          
+          // Clear again after a delay to ensure it stays cleared
+          // (in case notification count listener updates badge)
+          setTimeout(async () => {
+            await clearAppBadge();
+            console.log("✅ Badge cleared again (ensuring it stays cleared after notifications marked as seen)");
+          }, 1000);
+        } catch (error) {
+          console.error("Error clearing badge:", error);
         }
       } catch (error) {
         console.error("Error marking notifications as seen:", error);
