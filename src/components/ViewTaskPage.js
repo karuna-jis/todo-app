@@ -511,10 +511,19 @@ const addTask = async () => {
         style={{ backgroundColor: "#2a8c7b", gap: "10px", position: "sticky", top: 0, zIndex: 100, paddingLeft: "12px", paddingRight: "12px", marginLeft: 0, marginRight: 0 }}
       >
         <div className="flex-grow-1" style={{ minWidth: "120px", display: "flex", flexDirection: "column" }}>
-          <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: isMobile ? "flex-start" : "flex-start" }}>
+          <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: isMobile ? "center" : "flex-start", position: "relative" }}>
             <button
               className="btn btn-light back-btn-responsive"
-              style={{ borderRadius: "50%", width: "35px", height: "35px", padding: 0, fontSize: "18px", flexShrink: 0, order: 1 }}
+              style={{ 
+                borderRadius: "50%", 
+                width: "35px", 
+                height: "35px", 
+                padding: 0, 
+                fontSize: "18px", 
+                flexShrink: 0, 
+                order: 1,
+                ...(isMobile ? { position: "absolute", left: "0px", zIndex: 10 } : {})
+              }}
               onClick={() => window.history.back()}
             >
               ←
