@@ -543,6 +543,9 @@ const addTask = async () => {
             <h1 className="text-white fw-bold task-title-responsive mb-0">JIS Project Chat</h1>
           </div>
           <div className="d-flex align-items-center" style={{ gap: "8px", justifyContent: "center", marginTop: "4px" }}>
+          <h2 className="text-white task-subtitle-responsive mb-0" style={{ fontSize: "14px" }}>
+              {projectName}
+            </h2>
             <button
               className="btn btn-light back-btn-responsive"
               style={{ 
@@ -560,9 +563,7 @@ const addTask = async () => {
             >
               ←
             </button>
-            <h2 className="text-white task-subtitle-responsive mb-0" style={{ fontSize: "14px" }}>
-              {projectName}
-            </h2>
+          
           </div>
         </div>
 
