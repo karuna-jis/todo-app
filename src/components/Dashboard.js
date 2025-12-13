@@ -1468,8 +1468,8 @@ export default function Dashboard() {
                 </>
               )}
 
-              {/* MARK ATTENDANCE BUTTON */}
-              {userUID && (
+              {/* MARK ATTENDANCE BUTTON - Only for non-admin users */}
+              {userUID && userRole !== "admin" && (
                 <div className="mb-3 mb-md-4">
                   <button
                     className="btn btn-primary w-100 w-md-auto"
