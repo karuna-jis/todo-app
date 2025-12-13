@@ -1624,9 +1624,48 @@ export default function Dashboard() {
                 paddingBottom: userRole === "admin" ? "70px" : "20px"
               }}
             >
-              <h3 className="mb-2 mb-md-3 users-page-title">All Users</h3>
+              {/* ADMINS TABLE */}
+              {userRole === "admin" && (
+                <>
+                  <h3 className="mb-2 mb-md-3 users-page-title">Admins</h3>
+                  {allUsers.filter((user) => user.role === "admin").length === 0 ? (
+                    <p className="mb-4">No admins found.</p>
+                  ) : (
+                    <div className="table-responsive mb-4">
+                      <table className="table table-bordered users-table">
+                        <thead>
+                          <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allUsers
+                            .filter((user) => user.role === "admin")
+                            .map((user) => (
+                              <tr key={user.id}>
+                                <td>{user.username}</td>
+                                <td>{user.email}</td>
+                                <td>{user.role}</td>
+                                <td>
+                                  <button className="btn btn-danger btn-sm user-delete-btn" onClick={() => deleteUser(user.id)}>
+                                    Delete
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
 
-              {allUsers.length === 0 ? (
+              {/* USERS TABLE */}
+              <h3 className="mb-2 mb-md-3 users-page-title">Users</h3>
+              {allUsers.filter((user) => user.role !== "admin").length === 0 ? (
                 <p>No users found.</p>
               ) : (
                 <div className="table-responsive">
@@ -1639,21 +1678,21 @@ export default function Dashboard() {
                         <th>Action</th>
                       </tr>
                     </thead>
-
                     <tbody>
                       {allUsers
-                      .map((user) => (
-                        <tr key={user.id}>
-                          <td>{user.username}</td>
-                          <td>{user.email}</td>
-                          <td>{user.role}</td>
-                          <td>
-                            <button className="btn btn-danger btn-sm user-delete-btn" onClick={() => deleteUser(user.id)}>
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                        .filter((user) => user.role !== "admin")
+                        .map((user) => (
+                          <tr key={user.id}>
+                            <td>{user.username}</td>
+                            <td>{user.email}</td>
+                            <td>{user.role}</td>
+                            <td>
+                              <button className="btn btn-danger btn-sm user-delete-btn" onClick={() => deleteUser(user.id)}>
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
