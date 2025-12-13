@@ -2,7 +2,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { auth, db } from "./firebase.js";
+import { onMessage, messaging } from "./firebase";
 import { clearAppBadge } from "../utils/badge";
+import { useNotification } from "../contexts/NotificationContext";
 
 import {
   collection,
@@ -34,6 +36,7 @@ import { Paper } from "@mui/material";
 
 export default function ViewTaskPage() {
   const { projectId, projectName } = useParams();
+  const { showNotification } = useNotification();
 
   const [taskText, setTaskText] = useState("");
   const [tasks, setTasks] = useState([]);
@@ -46,6 +49,7 @@ export default function ViewTaskPage() {
   // Refs for task cards (for scrolling to selected item)
   const taskRefs = useRef({});
   const headerRef = useRef(null);
+  const previousTasksRef = useRef([]); // Track previous tasks to detect new ones
 
   // modal state (edit)
   const [showEditModal, setShowEditModal] = useState(false);
@@ -170,6 +174,40 @@ const tasksColPath = projectId
     markNotificationsAsSeen();
   }, [projectId]);
 
+  // Play notification sound function
+  const playNotificationSound = () => {
+    try {
+      // Create audio element for notification sound
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGW67+efTQ8MTqfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBhluu/nn00PDE6n4/C2YxwGOJHX8sx5LAUkd8fw3ZBAC');
+      audio.volume = 0.7; // Set volume (0.0 to 1.0)
+      audio.play().catch(err => {
+        console.log("Could not play notification sound:", err);
+        // Fallback: Use Web Audio API for simple beep
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 800; // Higher pitch like WhatsApp
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (audioErr) {
+          console.log("Could not play fallback sound:", audioErr);
+        }
+      });
+    } catch (error) {
+      console.log("Sound playback error:", error);
+    }
+  };
+
   // realtime listener
   useEffect(() => {
     if (!projectId || !tasksColPath) return;
@@ -179,6 +217,52 @@ const tasksColPath = projectId
       q,
       (snap) => {
         const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const previousTasks = previousTasksRef.current;
+        
+        // Detect new tasks (not created by current user)
+        if (previousTasks.length > 0 && arr.length > previousTasks.length) {
+          const currentUser = auth.currentUser;
+          const currentUserEmail = currentUser?.email;
+          
+          // Find new tasks
+          const newTasks = arr.filter(newTask => {
+            const exists = previousTasks.find(prevTask => prevTask.id === newTask.id);
+            if (!exists) {
+              // Only play sound if task was created by someone else
+              const createdBy = newTask.createdBy || "";
+              return createdBy !== currentUserEmail;
+            }
+            return false;
+          });
+          
+          // Play sound for each new task from other users
+          if (newTasks.length > 0) {
+            console.log(`🔔 New task(s) detected: ${newTasks.length}`);
+            playNotificationSound();
+            
+            // Also show notification popup for each new task
+            newTasks.forEach(task => {
+              const createdBy = task.createdBy || "Unknown";
+              const taskText = task.text || "New Task";
+              
+              showNotification({
+                title: "New Task Added",
+                body: `${createdBy} added new task: ${taskText}`,
+                projectId: projectId,
+                projectName: projectName || "",
+                taskId: task.id,
+                taskName: taskText,
+                addedBy: task.createdBy || "",
+                addedByName: task.createdBy || "",
+                link: `/view/${projectId}/${encodeURIComponent(projectName || "")}`,
+                timestamp: Date.now(),
+              });
+            });
+          }
+        }
+        
+        // Update previous tasks reference
+        previousTasksRef.current = arr;
         setTasks(arr);
       },
       (err) => {
@@ -188,7 +272,42 @@ const tasksColPath = projectId
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, projectName, showNotification]);
+
+  // Handle foreground FCM messages (when app is open)
+  useEffect(() => {
+    if (!messaging || !onMessage) return;
+
+    const unsubscribe = onMessage(messaging, (payload) => {
+      // Only handle notifications for current project
+      const payloadProjectId = payload.data?.projectId || "";
+      if (payloadProjectId !== projectId) return;
+
+      const addedBy = payload.data?.addedByName || payload.data?.addedBy || payload.data?.createdBy || "Unknown";
+      const taskName = payload.data?.taskName || "New Task";
+
+      // Play sound
+      playNotificationSound();
+
+      // Show notification popup
+      showNotification({
+        title: "New Task Added",
+        body: `${addedBy} added new task: ${taskName}`,
+        projectId: payloadProjectId,
+        projectName: payload.data?.projectName || projectName || "",
+        taskId: payload.data?.taskId || "",
+        taskName: taskName,
+        addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
+        addedByName: addedBy,
+        link: payload.data?.link || `/view/${projectId}/${encodeURIComponent(projectName || "")}`,
+        timestamp: payload.data?.timestamp || Date.now(),
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [projectId, projectName, showNotification]);
 
   // Fetch user role
   useEffect(() => {
