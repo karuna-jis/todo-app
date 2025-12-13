@@ -293,12 +293,12 @@ export default function ProjectBoard() {
         >
           <CardContent
             style={{
-              backgroundColor: "#ffd93dff",
+              backgroundColor: "#ffcccc",
               padding: "16px",
-              borderBottom: "2px solid #f0c020",
+              borderBottom: "2px solid #ff9999",
             }}
           >
-            <Typography variant="h6" style={{ fontWeight: 600, color: "#856404" }}>
+            <Typography variant="h6" style={{ fontWeight: 600, color: "#8b0000" }}>
               On Hold
             </Typography>
             <Typography variant="caption" color="text.secondary">
