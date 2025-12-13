@@ -536,7 +536,7 @@ const addTask = async () => {
       <div
         ref={headerRef}
         className="w-100 d-flex align-items-center justify-content-between flex-wrap py-2 py-md-3 task-header-responsive"
-        style={{ backgroundColor: "#2a8c7b", gap: "10px", position: "sticky", top: 0, zIndex: 100, paddingLeft: "12px", paddingRight: "12px", marginLeft: 0, marginRight: 0 }}
+        style={{ backgroundColor: "#2a8c7b", gap: "10px", position: "sticky", top: 0, zIndex: 100, paddingLeft: isMobile ? "8px" : "12px", paddingRight: "12px", marginLeft: 0, marginRight: 0 }}
       >
         <div className="flex-grow-1" style={{ minWidth: "120px", display: "flex", flexDirection: "column", position: "relative" }}>
           <div className="d-flex align-items-center" style={{ gap: "10px", justifyContent: isMobile ? "flex-start" : "center" }}>
@@ -568,14 +568,15 @@ const addTask = async () => {
                   height: "35px", 
                   padding: 0, 
                   fontSize: "18px", 
-                  flexShrink: 0
+                  flexShrink: 0,
+                  marginRight: "8px"
                 }}
                 onClick={() => window.history.back()}
               >
                 ←
               </button>
             )}
-            <h1 className="text-white fw-bold task-title-responsive mb-0">Chat Box</h1>
+            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ marginLeft: isMobile ? "0" : "0" }}>Chat Box</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px" }}>
             {projectName}
