@@ -167,6 +167,50 @@ service cloud.firestore {
       // Only admin can delete notifications
       allow delete: if isAdmin();
     }
+
+    // ---------------- ATTENDANCE ---------------- 
+    match /attendance/{attendanceId} {
+      function isAdmin() {
+        return request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      }
+
+      function isOwner() {
+        return request.auth != null &&
+          request.auth.uid == resource.data.userId;
+      }
+
+      function isCreatingOwnRecord() {
+        return request.auth != null &&
+          request.auth.uid == request.resource.data.userId &&
+          request.resource.data.userEmail == request.auth.token.email;
+      }
+
+      // ------------- READ -------------
+      // Users can read their own attendance records
+      // Admin can read all attendance records
+      allow read: if request.auth != null && (
+        isAdmin() ||
+        isOwner()
+      );
+
+      // ------------- CREATE -------------
+      // Users can create their own attendance records
+      // Must match their own userId and userEmail
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.userId &&
+        request.resource.data.userEmail == request.auth.token.email &&
+        // Ensure required fields are present
+        request.resource.data.keys().hasAll(["userId", "userEmail", "date", "loginTime", "logoutTime", "breaks", "totalWorkMinutes", "createdAt"]);
+
+      // ------------- UPDATE -------------
+      // No updates allowed (as per requirements - view only)
+      allow update: if false;
+
+      // ------------- DELETE -------------
+      // No deletes allowed (as per requirements - view only)
+      allow delete: if false;
+    }
   }
 }
 

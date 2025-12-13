@@ -16,6 +16,7 @@ import Login from "./components/Login.js";
 import Dashboard from "./components/Dashboard.js";
 import ViewTaskPage from "./components/ViewTaskPage.js";
 import ProjectBoard from "./components/ProjectBoard.js";
+import Attendance from "./pages/admin/Attendance.jsx";
 import { initializeBadge } from "./utils/badge";
 
 // Protected Route Component - redirects to dashboard if user is authenticated
@@ -111,6 +112,14 @@ function App() {
             element={
               <PrivateRoute>
                 <ProjectBoard />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/admin/attendance" 
+            element={
+              <PrivateRoute>
+                <Attendance />
               </PrivateRoute>
             } 
           />

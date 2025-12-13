@@ -27,6 +27,7 @@ import { onMessage, messaging } from "../components/firebase";
 import { initializeFCMToken } from "../utils/fcmToken";
 import { useNotification } from "../contexts/NotificationContext";
 import { incrementBadge, clearAppBadge, getBadgeCount, setAppBadge, isBadgeSupported } from "../utils/badge";
+import AttendanceModal from "./AttendanceModal";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -67,6 +68,9 @@ export default function Dashboard() {
 
   // UI page control
   const [activePage, setActivePage] = useState("dashboard");
+
+  // ATTENDANCE MODAL
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
 
   // NOTIFICATIONS STATE
   const [notifications, setNotifications] = useState([]);
@@ -1338,6 +1342,14 @@ export default function Dashboard() {
               >
                 📁 Projects
               </button>
+
+              <button
+               className="btn w-100 mb-2 mb-md-3 text-white fw-bold sidebar-btn"
+                onClick={() => navigate("/admin/attendance")}
+                style={{ cursor: "pointer", padding: "10px", backgroundColor: "#2a8c7b", fontSize: "14px"}}
+              >
+                📅 Attendance Records
+              </button>
                
             </div>
             
@@ -1454,6 +1466,25 @@ export default function Dashboard() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* MARK ATTENDANCE BUTTON */}
+              {userUID && (
+                <div className="mb-3 mb-md-4">
+                  <button
+                    className="btn btn-primary w-100 w-md-auto"
+                    onClick={() => setShowAttendanceModal(true)}
+                    style={{
+                      backgroundColor: "#2a8c7b",
+                      borderColor: "#2a8c7b",
+                      padding: "10px 20px",
+                      fontSize: "16px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    📅 Mark Attendance
+                  </button>
+                </div>
               )}
 
               {/* PROJECT LIST */}
@@ -1795,6 +1826,14 @@ export default function Dashboard() {
       )}
 
       {/* Notification Panel - Removed bell icon, using badges on project cards only */}
+
+      {/* ATTENDANCE MODAL */}
+      <AttendanceModal
+        show={showAttendanceModal}
+        onClose={() => setShowAttendanceModal(false)}
+        userEmail={userEmail}
+        userId={userUID}
+      />
     </div>
   );
 }
