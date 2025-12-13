@@ -240,6 +240,51 @@ const tasksColPath = projectId
             console.log(`🔔 New task(s) detected: ${newTasks.length}`);
             playNotificationSound();
             
+            // Mark notifications as seen for these tasks immediately
+            const markTaskNotificationsAsSeen = async () => {
+              try {
+                const user = auth.currentUser;
+                const currentUserUID = user?.uid;
+                if (!currentUserUID) return;
+
+                const notificationsRef = collection(db, "notifications");
+                
+                // Mark each new task's notification as seen
+                for (const task of newTasks) {
+                  const taskId = task.id;
+                  
+                  // Find notification for this task
+                  const q = query(
+                    notificationsRef,
+                    where("projectId", "==", projectId),
+                    where("taskId", "==", taskId)
+                  );
+                  
+                  const snapshot = await getDocs(q);
+                  
+                  // Update all notifications for this task
+                  snapshot.docs.forEach(async (docSnap) => {
+                    const notificationData = docSnap.data();
+                    const seenBy = notificationData.seenBy || [];
+                    
+                    // Only update if not already seen
+                    if (!seenBy.includes(currentUserUID)) {
+                      const docRef = doc(db, "notifications", docSnap.id);
+                      await updateDoc(docRef, {
+                        seenBy: arrayUnion(currentUserUID),
+                      });
+                      console.log(`✅ Marked notification ${docSnap.id} as seen for task ${taskId}`);
+                    }
+                  });
+                }
+              } catch (error) {
+                console.error("Error marking task notifications as seen:", error);
+              }
+            };
+            
+            // Mark notifications as seen immediately
+            markTaskNotificationsAsSeen();
+            
             // Also show notification popup for each new task
             newTasks.forEach(task => {
               const createdBy = task.createdBy || "Unknown";
@@ -285,6 +330,47 @@ const tasksColPath = projectId
 
       const addedBy = payload.data?.addedByName || payload.data?.addedBy || payload.data?.createdBy || "Unknown";
       const taskName = payload.data?.taskName || "New Task";
+      const taskId = payload.data?.taskId || "";
+
+      // Mark notification as seen immediately since user is viewing the page
+      const markNotificationAsSeen = async () => {
+        try {
+          const user = auth.currentUser;
+          const currentUserUID = user?.uid;
+          if (!currentUserUID || !taskId) return;
+
+          const notificationsRef = collection(db, "notifications");
+          
+          // Find notification for this task
+          const q = query(
+            notificationsRef,
+            where("projectId", "==", projectId),
+            where("taskId", "==", taskId)
+          );
+          
+          const snapshot = await getDocs(q);
+          
+          // Update all notifications for this task
+          snapshot.docs.forEach(async (docSnap) => {
+            const notificationData = docSnap.data();
+            const seenBy = notificationData.seenBy || [];
+            
+            // Only update if not already seen
+            if (!seenBy.includes(currentUserUID)) {
+              const docRef = doc(db, "notifications", docSnap.id);
+              await updateDoc(docRef, {
+                seenBy: arrayUnion(currentUserUID),
+              });
+              console.log(`✅ Marked FCM notification ${docSnap.id} as seen for task ${taskId}`);
+            }
+          });
+        } catch (error) {
+          console.error("Error marking FCM notification as seen:", error);
+        }
+      };
+      
+      // Mark as seen immediately
+      markNotificationAsSeen();
 
       // Play sound
       playNotificationSound();
@@ -295,7 +381,7 @@ const tasksColPath = projectId
         body: `${addedBy} added new task: ${taskName}`,
         projectId: payloadProjectId,
         projectName: payload.data?.projectName || projectName || "",
-        taskId: payload.data?.taskId || "",
+        taskId: taskId,
         taskName: taskName,
         addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
         addedByName: addedBy,
