@@ -1642,7 +1642,6 @@ export default function Dashboard() {
 
                     <tbody>
                       {allUsers
-                      .filter((user) => user.role !== "admin")
                       .map((user) => (
                         <tr key={user.id}>
                           <td>{user.username}</td>
