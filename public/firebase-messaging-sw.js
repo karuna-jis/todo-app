@@ -736,6 +736,20 @@ self.addEventListener("notificationclick", (event) => {
     const projectName = data.projectName || "Project";
     urlToOpen = self.location.origin + `/view/${data.projectId}/${encodeURIComponent(projectName)}`;
   }
+  
+  // Add taskId to URL if available for highlighting
+  const taskId = data.taskId || "";
+  if (taskId) {
+    try {
+      const url = new URL(urlToOpen);
+      url.searchParams.set('taskId', taskId);
+      urlToOpen = url.toString();
+    } catch (e) {
+      // If URL parsing fails, append as query string
+      const separator = urlToOpen.includes('?') ? '&' : '?';
+      urlToOpen = urlToOpen + separator + 'taskId=' + taskId;
+    }
+  }
 
   console.log("[SW] Opening URL:", urlToOpen);
 

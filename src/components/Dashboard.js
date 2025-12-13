@@ -762,7 +762,7 @@ export default function Dashboard() {
                 taskName: taskName,
                 addedBy: addedBy,
                 addedByName: taskData.createdByName || addedBy,
-                link: `/view/${projectId}/${encodeURIComponent(project.name)}`,
+                link: `/view/${projectId}/${encodeURIComponent(project.name)}?taskId=${taskId}`,
                 timestamp: taskData.createdAt?.toMillis?.() || Date.now(),
               });
 

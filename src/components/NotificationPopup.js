@@ -76,8 +76,19 @@ const NotificationPopup = ({ notification, onClose }) => {
     });
 
     if (notification?.data?.link) {
-      // Navigate to the link
-      navigate(notification.data.link);
+      // Add taskId to URL if available for highlighting
+      const taskId = notification.data?.taskId || "";
+      let link = notification.data.link;
+      
+      if (taskId) {
+        // Add taskId as query parameter
+        const url = new URL(link, window.location.origin);
+        url.searchParams.set('taskId', taskId);
+        link = url.pathname + url.search;
+      }
+      
+      // Navigate to the link with taskId
+      navigate(link);
     }
     handleClose();
   };

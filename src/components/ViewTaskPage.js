@@ -1,6 +1,6 @@
 // ViewTaskPage.jsx
 import React, { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { auth, db } from "./firebase.js";
 import { onMessage, messaging } from "./firebase";
 import { clearAppBadge } from "../utils/badge";
@@ -36,6 +36,8 @@ import { Paper } from "@mui/material";
 
 export default function ViewTaskPage() {
   const { projectId, projectName } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { showNotification } = useNotification();
 
   const [taskText, setTaskText] = useState("");
@@ -45,6 +47,7 @@ export default function ViewTaskPage() {
   const [headerHeight, setHeaderHeight] = useState(0); // Header height for scrollable area
   const [isMobile, setIsMobile] = useState(false); // Check if mobile/tablet screen (max-width: 992px)
   const [userRole, setUserRole] = useState(""); // User role (admin/user)
+  const [highlightedTaskId, setHighlightedTaskId] = useState(null); // Task to highlight from notification
 
   // Refs for task cards (for scrolling to selected item)
   const taskRefs = useRef({});
@@ -299,7 +302,7 @@ const tasksColPath = projectId
                 taskName: taskText,
                 addedBy: task.createdBy || "",
                 addedByName: task.createdBy || "",
-                link: `/view/${projectId}/${encodeURIComponent(projectName || "")}`,
+                link: `/view/${projectId}/${encodeURIComponent(projectName || "")}?taskId=${task.id}`,
                 timestamp: Date.now(),
               });
             });
@@ -376,6 +379,10 @@ const tasksColPath = projectId
       playNotificationSound();
 
       // Show notification popup
+      const notificationLink = taskId 
+        ? `/view/${projectId}/${encodeURIComponent(projectName || "")}?taskId=${taskId}`
+        : (payload.data?.link || `/view/${projectId}/${encodeURIComponent(projectName || "")}`);
+      
       showNotification({
         title: "New Task Added",
         body: `${addedBy} added new task: ${taskName}`,
@@ -385,7 +392,7 @@ const tasksColPath = projectId
         taskName: taskName,
         addedBy: payload.data?.addedBy || payload.data?.createdBy || "",
         addedByName: addedBy,
-        link: payload.data?.link || `/view/${projectId}/${encodeURIComponent(projectName || "")}`,
+        link: notificationLink,
         timestamp: payload.data?.timestamp || Date.now(),
       });
     });
@@ -394,6 +401,36 @@ const tasksColPath = projectId
       if (unsubscribe) unsubscribe();
     };
   }, [projectId, projectName, showNotification]);
+
+  // Handle taskId from URL (from notification click)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const taskIdFromUrl = searchParams.get('taskId');
+    
+    if (taskIdFromUrl && tasks.length > 0) {
+      // Find the task
+      const task = tasks.find(t => t.id === taskIdFromUrl);
+      if (task && taskRefs.current[taskIdFromUrl]) {
+        // Scroll to and highlight the task
+        setTimeout(() => {
+          taskRefs.current[taskIdFromUrl].scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          setHighlightedTaskId(taskIdFromUrl);
+          
+          // Remove highlight after 3 seconds
+          setTimeout(() => {
+            setHighlightedTaskId(null);
+            // Remove taskId from URL
+            const newSearchParams = new URLSearchParams(location.search);
+            newSearchParams.delete('taskId');
+            navigate(`${location.pathname}${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`, { replace: true });
+          }, 3000);
+        }, 500); // Small delay to ensure DOM is ready
+      }
+    }
+  }, [location.search, tasks, navigate, location.pathname]);
 
   // Fetch user role
   useEffect(() => {
@@ -1062,10 +1099,11 @@ const addTask = async () => {
                 borderRadius: 10, 
                 maxWidth: "330px", 
                 width: "100%",
-                boxShadow: isSelected ? "0 4px 8px rgba(255, 235, 59, 0.5)" : "0 2px 4px rgba(0,0,0,0.1)",
-                border: isSelected ? "2px solid #ffeb3b" : "none",
-                transition: "all 0.2s ease",
-                backgroundColor: isSelected ? "#fffde7" : "white",
+                boxShadow: (isSelected || highlightedTaskId === t.id) ? "0 4px 12px rgba(76, 175, 80, 0.6)" : "0 2px 4px rgba(0,0,0,0.1)",
+                border: (isSelected || highlightedTaskId === t.id) ? "3px solid #4caf50" : "none",
+                transition: "all 0.3s ease",
+                backgroundColor: (isSelected || highlightedTaskId === t.id) ? "#e8f5e9" : "white",
+                transform: highlightedTaskId === t.id ? "scale(1.02)" : "scale(1)",
               }}
             >
               <div className="d-flex align-items-start justify-content-between flex-wrap task-card-content">
