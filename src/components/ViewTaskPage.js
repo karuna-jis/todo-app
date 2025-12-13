@@ -576,7 +576,7 @@ const addTask = async () => {
                 ←
               </button>
             )}
-            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ marginLeft: isMobile ? "0" : "0" }}>Chat Box</h1>
+            <h1 className="text-white fw-bold task-title-responsive mb-0" style={{ marginLeft: isMobile ? "0" : "0" }}>JIS Project Chat</h1>
           </div>
           <h2 className="text-white task-subtitle-responsive text-center" style={{ fontSize: "14px", marginTop: "4px" }}>
             {projectName}
