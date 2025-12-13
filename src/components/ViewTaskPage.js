@@ -1171,6 +1171,8 @@ const addTask = async () => {
           ? "#eecf6aff"      // light yellow
           : t.status === "In Progress"
           ? "#9bc6f3ff"      // light blue
+          : t.status === "On Hold"
+          ? "#ffcccc"        // light red
           : "white",       // default
       fontWeight: "500",
     }}
