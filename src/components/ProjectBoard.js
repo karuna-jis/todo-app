@@ -92,6 +92,9 @@ export default function ProjectBoard() {
   const inProgressTasks = tasks.filter(
     (t) => t.status?.toLowerCase() === "in progress" || t.status?.toLowerCase() === "progress"
   );
+  const onHoldTasks = tasks.filter(
+    (t) => t.status?.toLowerCase() === "on hold" || t.status?.toLowerCase() === "onhold"
+  );
   const completedTasks = tasks.filter(
     (t) => t.status?.toLowerCase() === "completed"
   );
@@ -180,7 +183,7 @@ export default function ProjectBoard() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
           gap: "20px",
           minHeight: "calc(100vh - 200px)",
         }}
@@ -271,6 +274,51 @@ export default function ProjectBoard() {
             ) : (
               <Timeline position="right">
                 {inProgressTasks.map((task) => renderTaskCard(task))}
+              </Timeline>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* On Hold Column */}
+        <Card
+          style={{
+            backgroundColor: "white",
+            borderRadius: "8px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "calc(100vh - 200px)",
+            overflow: "hidden",
+          }}
+        >
+          <CardContent
+            style={{
+              backgroundColor: "#ffd93dff",
+              padding: "16px",
+              borderBottom: "2px solid #f0c020",
+            }}
+          >
+            <Typography variant="h6" style={{ fontWeight: 600, color: "#856404" }}>
+              On Hold
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {onHoldTasks.length} task{onHoldTasks.length !== 1 ? "s" : ""}
+            </Typography>
+          </CardContent>
+          <CardContent
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "16px",
+            }}
+          >
+            {onHoldTasks.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" style={{ textAlign: "center", padding: "20px" }}>
+                No on-hold tasks
+              </Typography>
+            ) : (
+              <Timeline position="right">
+                {onHoldTasks.map((task) => renderTaskCard(task))}
               </Timeline>
             )}
           </CardContent>

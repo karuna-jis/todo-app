@@ -62,7 +62,7 @@ export default function ViewTaskPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
 
-  const STATUS_OPTIONS = ["Pending", "In Progress", "Completed"];
+  const STATUS_OPTIONS = ["Pending", "In Progress", "On Hold", "Completed"];
   const [showAddBox, setShowAddBox] = useState(false);
   // const tasksColPath = collection(db, "projects", projectId, "tasks");
 const tasksColPath = projectId
