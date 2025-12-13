@@ -9,18 +9,18 @@ const AttendanceModal = ({ show, onClose, userEmail, userId }) => {
   const [breaks, setBreaks] = useState([]);
   const [activeBreak, setActiveBreak] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Set current time as login time when modal opens
+  // Set current time as login time when modal opens for the first time (only if loginTime is empty)
   useEffect(() => {
-    if (show) {
+    if (show && !hasInitialized && !loginTime) {
       const now = new Date();
       const timeString = now.toTimeString().slice(0, 5); // HH:MM format
       setLoginTime(timeString);
-      setLogoutTime("");
-      setBreaks([]);
-      setActiveBreak(null);
+      setHasInitialized(true);
     }
-  }, [show]);
+    // Don't reset when modal closes - preserve state
+  }, [show, hasInitialized, loginTime]);
 
   const handleStartBreak = () => {
     if (activeBreak) {
@@ -177,6 +177,12 @@ const AttendanceModal = ({ show, onClose, userEmail, userId }) => {
         timer: 2000,
       });
 
+      // Reset state after successful submission
+      setLoginTime("");
+      setLogoutTime("");
+      setBreaks([]);
+      setActiveBreak(null);
+      setHasInitialized(false);
       onClose();
     } catch (error) {
       console.error("Error submitting attendance:", error);
@@ -190,6 +196,30 @@ const AttendanceModal = ({ show, onClose, userEmail, userId }) => {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    // Warn user if there's an active break
+    if (activeBreak) {
+      Swal.fire({
+        title: "Active Break Detected",
+        text: "You have an active break. Do you want to close without ending it?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, Close",
+        cancelButtonText: "Cancel",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // User confirmed, close modal but keep state for next time
+          onClose();
+        }
+      });
+    } else {
+      // No active break, safe to close
+      onClose();
     }
   };
 
@@ -208,7 +238,7 @@ const AttendanceModal = ({ show, onClose, userEmail, userId }) => {
             <button
               type="button"
               className="btn-close"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             ></button>
           </div>
@@ -277,7 +307,7 @@ const AttendanceModal = ({ show, onClose, userEmail, userId }) => {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             >
               Cancel
